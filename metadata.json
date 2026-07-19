@@ -1,0 +1,6 @@
+{
+  "name": "Hi Care Home Medical Services Billing System",
+  "description": "نظام إصدار وإدارة الفواتير لشركة هاي كير للخدمات الطبية المنزلية، يدعم الصلاحيات والعملاء والخدمات والطباعة والواتساب وسجل العمليات.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
