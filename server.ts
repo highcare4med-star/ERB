@@ -732,6 +732,9 @@ app.get('/api/logs', requireAuth, requirePermission('view_logs'), (req, res) => 
 // --- Vite Middleware Integration ---
 
 async function startServer() {
+  await db.init();
+  console.log('SQLite database initialized successfully.');
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

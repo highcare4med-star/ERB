@@ -1,3 +1,4 @@
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -104,7 +105,8 @@ export interface DatabaseSchema {
   rowLocks: RowLock[];
 }
 
-const DB_FILE_PATH = path.join(process.cwd(), 'data', 'db.json');
+const DB_SQLITE_PATH = path.join(process.cwd(), 'database.sqlite');
+const LEGACY_JSON_PATH = path.join(process.cwd(), 'data', 'db.json');
 
 // Helper to encrypt passwords using SHA-256
 export function hashPassword(password: string): string {
@@ -174,6 +176,15 @@ const DEFAULT_ROLES: Role[] = [
 ];
 
 const DEFAULT_USERS: User[] = [
+  {
+    id: 'user-ismael',
+    username: 'ismael',
+    passwordHash: hashPassword('Lokaloka44'),
+    fullName: 'إسماعيل (مدير النظام)',
+    roleId: 'admin',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
   {
     id: 'user-admin',
     username: 'admin',
@@ -250,21 +261,21 @@ const DEFAULT_SERVICES: Service[] = [
   },
   {
     id: 'srv-6',
-    name: 'رعاية الأطفال وحديثي الولادة المنزلية',
-    defaultPrice: 350,
-    description: 'عناية تمريضية ورعاية شاملة للأطفال وحديثي الولادة والخدج تحت إشراف متخصص',
+    name: 'تغيير على الجروح المعقدة والحروق',
+    defaultPrice: 250,
+    description: 'تنظيف وتغيير معقم للجروح والحروق باستخدام أحدث المواد المعقمة',
     isActive: true
   },
   {
     id: 'srv-7',
-    name: 'تركيب مغذي ومحلول وريدي منزلي',
+    name: 'تركيب وتغيير القسطرة البولية بالمنزل',
     defaultPrice: 150,
-    description: 'تركيب الكانيولا وإعطاء المحاليل الطبية والوريدية الموصوفة من الطبيب بالمنزل',
+    description: 'خدمة التمريض المنزلي لتركيب أو العناية بالقسطرة البولية بصورة معقمة',
     isActive: true
   },
   {
     id: 'srv-8',
-    name: 'سحب عينات تحاليل مخبرية منزلية',
+    name: 'سحب العينات التحليلية المنزلية',
     defaultPrice: 100,
     description: 'سحب الدم والعينات المخبرية وتوصيلها للمختبر المعتمد مع إرسال النتائج',
     isActive: true
@@ -529,125 +540,415 @@ const DEFAULT_SETTINGS: Settings = {
   logoUrl: '/logo.jpg'
 };
 
-export class JSONDatabase {
-  private cache: DatabaseSchema | null = null;
+export class SQLiteDatabase {
+  private db!: SqlJsDatabase;
+  private isReady = false;
 
-  constructor() {
-    this.init();
+  public async init() {
+    if (this.isReady) return;
+    const SQL = await initSqlJs();
+
+    let fileBuffer: Buffer | null = null;
+    if (fs.existsSync(DB_SQLITE_PATH)) {
+      try {
+        fileBuffer = fs.readFileSync(DB_SQLITE_PATH);
+      } catch (e) {
+        console.error('Error reading database.sqlite:', e);
+      }
+    }
+
+    if (fileBuffer) {
+      this.db = new SQL.Database(fileBuffer);
+    } else {
+      this.db = new SQL.Database();
+    }
+
+    this.initTablesAndMigrate();
+    this.isReady = true;
   }
 
-  private init() {
+  // Persist current state of SQLite DB to database.sqlite file on disk
+  private save() {
+    if (this.inTransaction) {
+      // Defer export until transaction finishes and commits
+      return;
+    }
     try {
-      const dir = path.dirname(DB_FILE_PATH);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+      const data = this.db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(DB_SQLITE_PATH, buffer);
+    } catch (err) {
+      console.error('Failed to save database.sqlite to disk:', err);
+    }
+  }
+
+  private queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
+    const stmt = this.db.prepare(sql);
+    try {
+      if (params.length > 0) {
+        stmt.bind(params);
+      }
+      if (stmt.step()) {
+        return stmt.getAsObject() as T;
+      }
+      return undefined;
+    } finally {
+      stmt.free();
+    }
+  }
+
+  private queryAll<T = any>(sql: string, params: any[] = []): T[] {
+    const stmt = this.db.prepare(sql);
+    const results: T[] = [];
+    try {
+      stmt.bind(params);
+      while (stmt.step()) {
+        results.push(stmt.getAsObject() as T);
+      }
+      return results;
+    } finally {
+      stmt.free();
+    }
+  }
+
+  private run(sql: string, params: any[] = []): void {
+    const stmt = this.db.prepare(sql);
+    try {
+      stmt.run(params);
+    } finally {
+      stmt.free();
+    }
+  }
+
+  private inTransaction = false;
+
+  private transaction<T>(fn: () => T): T {
+    if (this.inTransaction) {
+      return fn();
+    }
+    this.inTransaction = true;
+    try {
+      this.db.exec('BEGIN TRANSACTION;');
+      const result = fn();
+      this.db.exec('COMMIT;');
+      this.inTransaction = false;
+      this.save();
+      return result;
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK;');
+      } catch (e) {
+        // Ignore if rollback fails (e.g. SQLite auto-rolled back on error)
+      }
+      throw err;
+    } finally {
+      this.inTransaction = false;
+    }
+  }
+
+  private initTablesAndMigrate() {
+    // 1. Create tables if they do not exist
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS roles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        name_ar TEXT NOT NULL,
+        description TEXT NOT NULL,
+        permissions TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        role_id TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS services (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        default_price REAL NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT NOT NULL,
+        customer_address TEXT NOT NULL DEFAULT '',
+        subtotal REAL NOT NULL,
+        discount_type TEXT NOT NULL DEFAULT 'value',
+        discount_value REAL NOT NULL DEFAULT 0,
+        discount_amount REAL NOT NULL DEFAULT 0,
+        total REAL NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'new',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id TEXT NOT NULL,
+        service_id TEXT NOT NULL,
+        service_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        price REAL NOT NULL,
+        total REAL NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        company_name TEXT NOT NULL,
+        company_name_en TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL,
+        email TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        vat_number TEXT NOT NULL,
+        invoice_policy TEXT NOT NULL DEFAULT '',
+        primary_color TEXT NOT NULL DEFAULT '#0d9488',
+        secondary_color TEXT NOT NULL DEFAULT '#0f172a',
+        logo_url TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        action TEXT NOT NULL,
+        details TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        user_agent TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS row_locks (
+        invoice_id TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+    `);
+
+    // Check if database needs data from legacy db.json or default seed
+    const userCount = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users')?.count || 0;
+
+    if (userCount === 0) {
+      let legacyData: DatabaseSchema | null = null;
+      if (fs.existsSync(LEGACY_JSON_PATH)) {
+        try {
+          const raw = fs.readFileSync(LEGACY_JSON_PATH, 'utf-8');
+          legacyData = JSON.parse(raw);
+          console.log('Migrating legacy data from data/db.json to SQLite database.sqlite...');
+        } catch (e) {
+          console.error('Error reading legacy db.json:', e);
+        }
       }
 
-      if (!fs.existsSync(DB_FILE_PATH)) {
-        const initialSchema: DatabaseSchema = {
-          users: DEFAULT_USERS,
-          roles: DEFAULT_ROLES,
-          customers: [],
-          services: DEFAULT_SERVICES,
-          invoices: [],
-          activityLogs: [
-            {
-              id: 'log-init',
-              username: 'system',
-              timestamp: new Date().toISOString(),
-              action: 'تهيئة النظام',
-              details: 'تم إنشاء قاعدة البيانات وتهيئة الحسابات والخدمات الافتراضية بنجاح',
-              ipAddress: '127.0.0.1',
-              userAgent: 'System Initializer'
+      this.transaction(() => {
+        // Populate Roles
+        const rolesToInsert = (legacyData?.roles && legacyData.roles.length > 0) ? legacyData.roles : DEFAULT_ROLES;
+        rolesToInsert.forEach(r => {
+          this.run(
+            'INSERT OR REPLACE INTO roles (id, name, name_ar, description, permissions) VALUES (?, ?, ?, ?, ?)',
+            [r.id, r.name, r.nameAr, r.description, JSON.stringify(r.permissions || [])]
+          );
+        });
+
+        // Populate Users
+        const usersToInsert = (legacyData?.users && legacyData.users.length > 0) ? legacyData.users : DEFAULT_USERS;
+        usersToInsert.forEach(u => {
+          this.run(
+            'INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [u.id, u.username.toLowerCase(), u.passwordHash, u.fullName, u.roleId, u.isActive ? 1 : 0, u.createdAt]
+          );
+        });
+
+        // Populate Customers
+        if (legacyData?.customers && legacyData.customers.length > 0) {
+          legacyData.customers.forEach(c => {
+            this.run(
+              'INSERT OR REPLACE INTO customers (id, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              [c.id, c.name, c.phone, c.address || '', c.notes || '', c.createdAt]
+            );
+          });
+        }
+
+        // Populate Services
+        const servicesToInsert = (legacyData?.services && legacyData.services.length > 0) ? legacyData.services : DEFAULT_SERVICES;
+        servicesToInsert.forEach(s => {
+          this.run(
+            'INSERT OR REPLACE INTO services (id, name, default_price, description, is_active) VALUES (?, ?, ?, ?, ?)',
+            [s.id, s.name, s.defaultPrice, s.description || '', s.isActive ? 1 : 0]
+          );
+        });
+
+        // Populate Invoices & Invoice Items
+        if (legacyData?.invoices && legacyData.invoices.length > 0) {
+          legacyData.invoices.forEach(i => {
+            this.run(
+              'INSERT OR REPLACE INTO invoices (id, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [i.id, i.date, i.customerId, i.customerName, i.customerPhone, i.customerAddress || '', i.subtotal, i.discountType, i.discountValue, i.discountAmount, i.total, i.notes || '', i.createdBy, i.status, i.createdAt]
+            );
+
+            if (i.items && i.items.length > 0) {
+              i.items.forEach(item => {
+                this.run(
+                  'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+                  [i.id, item.serviceId, item.serviceName, item.quantity, item.price, item.total]
+                );
+              });
             }
-          ],
-          settings: DEFAULT_SETTINGS,
-          rowLocks: []
-        };
-        fs.writeFileSync(DB_FILE_PATH, JSON.stringify(initialSchema, null, 2), 'utf-8');
-        this.cache = initialSchema;
-      } else {
-        const fileContent = fs.readFileSync(DB_FILE_PATH, 'utf-8');
-        this.cache = JSON.parse(fileContent);
+          });
+        }
+
+        // Populate Settings
+        const settingsToInsert = legacyData?.settings || DEFAULT_SETTINGS;
+        this.run(
+          'INSERT OR REPLACE INTO settings (id, company_name, company_name_en, phone, email, address, vat_number, invoice_policy, primary_color, secondary_color, logo_url) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            settingsToInsert.companyName,
+            settingsToInsert.companyNameEn || '',
+            settingsToInsert.phone,
+            settingsToInsert.email || '',
+            settingsToInsert.address || '',
+            settingsToInsert.vatNumber,
+            settingsToInsert.invoicePolicy || '',
+            settingsToInsert.primaryColor || '#0d9488',
+            settingsToInsert.secondaryColor || '#0f172a',
+            settingsToInsert.logoUrl || null
+          ]
+        );
+
+        // Populate Activity Logs
+        if (legacyData?.activityLogs && legacyData.activityLogs.length > 0) {
+          legacyData.activityLogs.forEach(l => {
+            this.run(
+              'INSERT OR REPLACE INTO activity_logs (id, username, timestamp, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [l.id, l.username, l.timestamp, l.action, l.details, l.ipAddress || '127.0.0.1', l.userAgent || 'System']
+            );
+          });
+        } else {
+          this.run(
+            'INSERT INTO activity_logs (id, username, timestamp, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              `log-init-${Date.now()}`,
+              'system',
+              new Date().toISOString(),
+              'تهيئة النظام SQLite',
+              'تم إنشاء قاعدة بيانات SQLite وتخزين البيانات الأولية بنجاح',
+              '127.0.0.1',
+              'System Initializer'
+            ]
+          );
+        }
+      });
+
+      // Remove legacy db.json after successful migration if it existed
+      if (fs.existsSync(LEGACY_JSON_PATH)) {
+        try {
+          fs.unlinkSync(LEGACY_JSON_PATH);
+          console.log('Successfully deleted legacy data/db.json file.');
+        } catch (e) {
+          console.error('Could not remove legacy db.json file:', e);
+        }
       }
-    } catch (error) {
-      console.error('Error initializing JSON DB:', error);
+    } else {
+      this.save();
+    }
+
+    // Ensure ismael admin user exists and is configured as active admin
+    const ismaelUser = this.getUserByUsername('ismael');
+    if (!ismaelUser) {
+      this.run(
+        'INSERT INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['user-ismael', 'ismael', hashPassword('Lokaloka44'), 'إسماعيل (مدير النظام)', 'admin', 1, new Date().toISOString()]
+      );
+      this.save();
+    } else {
+      this.run(
+        'UPDATE users SET password_hash = ?, role_id = ?, is_active = 1 WHERE LOWER(username) = ?',
+        [hashPassword('Lokaloka44'), 'admin', 'ismael']
+      );
+      this.save();
     }
   }
 
-  private read(): DatabaseSchema {
-    if (this.cache) return this.cache;
-    try {
-      const fileContent = fs.readFileSync(DB_FILE_PATH, 'utf-8');
-      this.cache = JSON.parse(fileContent);
-      return this.cache!;
-    } catch (error) {
-      console.error('Error reading JSON DB, using cache:', error);
-      this.init();
-      return this.cache || {
-        users: [],
-        roles: [],
-        customers: [],
-        services: [],
-        invoices: [],
-        activityLogs: [],
-        settings: DEFAULT_SETTINGS,
-        rowLocks: []
-      };
-    }
-  }
-
-  private write(schema: DatabaseSchema) {
-    try {
-      this.cache = schema;
-      // Atomic write using a temporary file
-      const tempPath = `${DB_FILE_PATH}.tmp`;
-      fs.writeFileSync(tempPath, JSON.stringify(schema, null, 2), 'utf-8');
-      fs.renameSync(tempPath, DB_FILE_PATH);
-    } catch (error) {
-      console.error('Error writing JSON DB:', error);
-    }
-  }
-
-  // Activity log helper
+  // --- Helper to log activities ---
   public logActivity(username: string, action: string, details: string, ip: string, ua: string) {
-    const db = this.read();
-    const newLog: ActivityLog = {
-      id: `log-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-      username,
-      timestamp: new Date().toISOString(),
-      action,
-      details,
-      ipAddress: ip || 'unknown',
-      userAgent: ua || 'unknown'
-    };
-    db.activityLogs.unshift(newLog); // Prepend so latest are first
-    if (db.activityLogs.length > 5000) {
-      db.activityLogs = db.activityLogs.slice(0, 5000); // Limit log size
-    }
-    this.write(db);
+    const id = `log-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const timestamp = new Date().toISOString();
+    this.run(
+      'INSERT INTO activity_logs (id, username, timestamp, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, username, timestamp, action, details, ip || 'unknown', ua || 'unknown']
+    );
+    this.save();
   }
 
   // --- Users Operations ---
   public getUsers(): User[] {
-    return this.read().users;
+    const rows = this.queryAll('SELECT * FROM users ORDER BY created_at ASC');
+    return rows.map(r => ({
+      id: r.id,
+      username: r.username,
+      passwordHash: r.password_hash,
+      fullName: r.full_name,
+      roleId: r.role_id,
+      isActive: Boolean(r.is_active),
+      createdAt: r.created_at
+    }));
   }
 
   public getUserById(id: string): User | undefined {
-    return this.read().users.find(u => u.id === id);
+    const r = this.queryOne('SELECT * FROM users WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      username: r.username,
+      passwordHash: r.password_hash,
+      fullName: r.full_name,
+      roleId: r.role_id,
+      isActive: Boolean(r.is_active),
+      createdAt: r.created_at
+    };
   }
 
   public getUserByUsername(username: string): User | undefined {
-    return this.read().users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    const r = this.queryOne('SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [username.trim()]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      username: r.username,
+      passwordHash: r.password_hash,
+      fullName: r.full_name,
+      roleId: r.role_id,
+      isActive: Boolean(r.is_active),
+      createdAt: r.created_at
+    };
   }
 
   public saveUser(user: User, executor: string, ip: string, ua: string): User {
-    const db = this.read();
-    const index = db.users.findIndex(u => u.id === user.id);
-    if (index !== -1) {
-      const old = db.users[index];
-      db.users[index] = { ...user };
-      this.write(db);
+    const existing = this.getUserById(user.id);
+    this.run(
+      'INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [user.id, user.username.toLowerCase().trim(), user.passwordHash, user.fullName, user.roleId, user.isActive ? 1 : 0, user.createdAt]
+    );
+    this.save();
+
+    if (existing) {
       this.logActivity(
         executor,
         'تعديل مستخدم',
@@ -656,8 +957,6 @@ export class JSONDatabase {
         ua
       );
     } else {
-      db.users.push(user);
-      this.write(db);
       this.logActivity(
         executor,
         'إنشاء مستخدم',
@@ -670,13 +969,13 @@ export class JSONDatabase {
   }
 
   public deleteUser(id: string, executor: string, ip: string, ua: string): boolean {
-    const db = this.read();
-    const user = db.users.find(u => u.id === id);
+    const user = this.getUserById(id);
     if (!user) return false;
     if (user.username === 'admin') return false; // Prevent deleting master admin
 
-    db.users = db.users.filter(u => u.id !== id);
-    this.write(db);
+    this.run('DELETE FROM users WHERE id = ?', [id]);
+    this.save();
+
     this.logActivity(
       executor,
       'حذف مستخدم',
@@ -689,33 +988,77 @@ export class JSONDatabase {
 
   // --- Roles & Permissions ---
   public getRoles(): Role[] {
-    return this.read().roles;
+    const rows = this.queryAll('SELECT * FROM roles');
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      nameAr: r.name_ar,
+      description: r.description,
+      permissions: JSON.parse(r.permissions || '[]')
+    }));
   }
 
   public getRoleById(id: string): Role | undefined {
-    return this.read().roles.find(r => r.id === id);
+    const r = this.queryOne('SELECT * FROM roles WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      name: r.name,
+      nameAr: r.name_ar,
+      description: r.description,
+      permissions: JSON.parse(r.permissions || '[]')
+    };
   }
 
   // --- Customers Operations ---
   public getCustomers(): Customer[] {
-    return this.read().customers;
+    const rows = this.queryAll('SELECT * FROM customers ORDER BY created_at DESC');
+    return rows.map(c => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      address: c.address || '',
+      notes: c.notes || '',
+      createdAt: c.created_at
+    }));
   }
 
   public getCustomerById(id: string): Customer | undefined {
-    return this.read().customers.find(c => c.id === id);
+    const c = this.queryOne('SELECT * FROM customers WHERE id = ?', [id]);
+    if (!c) return undefined;
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      address: c.address || '',
+      notes: c.notes || '',
+      createdAt: c.created_at
+    };
   }
 
   public getCustomerByPhone(phone: string): Customer | undefined {
     const cleanPhone = phone.trim();
-    return this.read().customers.find(c => c.phone.trim() === cleanPhone);
+    const c = this.queryOne('SELECT * FROM customers WHERE TRIM(phone) = ?', [cleanPhone]);
+    if (!c) return undefined;
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      address: c.address || '',
+      notes: c.notes || '',
+      createdAt: c.created_at
+    };
   }
 
   public saveCustomer(customer: Customer, executor: string, ip: string, ua: string): Customer {
-    const db = this.read();
-    const index = db.customers.findIndex(c => c.id === customer.id);
-    if (index !== -1) {
-      db.customers[index] = { ...customer };
-      this.write(db);
+    const existing = this.getCustomerById(customer.id);
+    this.run(
+      'INSERT OR REPLACE INTO customers (id, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [customer.id, customer.name, customer.phone.trim(), customer.address || '', customer.notes || '', customer.createdAt]
+    );
+    this.save();
+
+    if (existing) {
       this.logActivity(
         executor,
         'تعديل عميل',
@@ -724,8 +1067,6 @@ export class JSONDatabase {
         ua
       );
     } else {
-      db.customers.push(customer);
-      this.write(db);
       this.logActivity(
         executor,
         'إنشاء عميل',
@@ -738,11 +1079,11 @@ export class JSONDatabase {
   }
 
   public deleteCustomer(id: string, executor: string, ip: string, ua: string): boolean {
-    const db = this.read();
-    const cust = db.customers.find(c => c.id === id);
+    const cust = this.getCustomerById(id);
     if (!cust) return false;
-    db.customers = db.customers.filter(c => c.id !== id);
-    this.write(db);
+    this.run('DELETE FROM customers WHERE id = ?', [id]);
+    this.save();
+
     this.logActivity(
       executor,
       'حذف عميل',
@@ -755,33 +1096,49 @@ export class JSONDatabase {
 
   // --- Services Operations ---
   public getServices(): Service[] {
-    return this.read().services;
+    const rows = this.queryAll('SELECT * FROM services');
+    return rows.map(s => ({
+      id: s.id,
+      name: s.name,
+      defaultPrice: Number(s.default_price),
+      description: s.description || '',
+      isActive: Boolean(s.is_active)
+    }));
   }
 
   public getServiceById(id: string): Service | undefined {
-    return this.read().services.find(s => s.id === id);
+    const s = this.queryOne('SELECT * FROM services WHERE id = ?', [id]);
+    if (!s) return undefined;
+    return {
+      id: s.id,
+      name: s.name,
+      defaultPrice: Number(s.default_price),
+      description: s.description || '',
+      isActive: Boolean(s.is_active)
+    };
   }
 
   public saveService(service: Service, executor: string, ip: string, ua: string): Service {
-    const db = this.read();
-    const index = db.services.findIndex(s => s.id === service.id);
-    if (index !== -1) {
-      db.services[index] = { ...service };
-      this.write(db);
+    const existing = this.getServiceById(service.id);
+    this.run(
+      'INSERT OR REPLACE INTO services (id, name, default_price, description, is_active) VALUES (?, ?, ?, ?, ?)',
+      [service.id, service.name, service.defaultPrice, service.description || '', service.isActive ? 1 : 0]
+    );
+    this.save();
+
+    if (existing) {
       this.logActivity(
         executor,
         'تعديل خدمة',
-        `تعديل بيانات الخدمة ${service.name} - السعر: ${service.defaultPrice} ريال`,
+        `تعديل بيانات الخدمة ${service.name} - السعر: ${service.defaultPrice} جنيه`,
         ip,
         ua
       );
     } else {
-      db.services.push(service);
-      this.write(db);
       this.logActivity(
         executor,
         'إضافة خدمة',
-        `إضافة خدمة جديدة ${service.name} - السعر: ${service.defaultPrice} ريال`,
+        `إضافة خدمة جديدة ${service.name} - السعر: ${service.defaultPrice} جنيه`,
         ip,
         ua
       );
@@ -790,11 +1147,11 @@ export class JSONDatabase {
   }
 
   public deleteService(id: string, executor: string, ip: string, ua: string): boolean {
-    const db = this.read();
-    const srv = db.services.find(s => s.id === id);
+    const srv = this.getServiceById(id);
     if (!srv) return false;
-    db.services = db.services.filter(s => s.id !== id);
-    this.write(db);
+    this.run('DELETE FROM services WHERE id = ?', [id]);
+    this.save();
+
     this.logActivity(
       executor,
       'حذف خدمة',
@@ -806,25 +1163,92 @@ export class JSONDatabase {
   }
 
   // --- Invoices Operations ---
+  private getInvoiceItemsForInvoices(invoiceIds: string[]): Map<string, InvoiceItem[]> {
+    const map = new Map<string, InvoiceItem[]>();
+    if (invoiceIds.length === 0) return map;
+
+    const allItems = this.queryAll('SELECT * FROM invoice_items ORDER BY id ASC');
+    allItems.forEach(row => {
+      if (!map.has(row.invoice_id)) {
+        map.set(row.invoice_id, []);
+      }
+      map.get(row.invoice_id)!.push({
+        serviceId: row.service_id,
+        serviceName: row.service_name,
+        quantity: Number(row.quantity),
+        price: Number(row.price),
+        total: Number(row.total)
+      });
+    });
+    return map;
+  }
+
   public getInvoices(): Invoice[] {
-    return this.read().invoices;
+    const rows = this.queryAll('SELECT * FROM invoices ORDER BY created_at DESC');
+    const invoiceIds = rows.map(r => r.id);
+    const itemsMap = this.getInvoiceItemsForInvoices(invoiceIds);
+
+    return rows.map(r => ({
+      id: r.id,
+      date: r.date,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      customerPhone: r.customer_phone,
+      customerAddress: r.customer_address || '',
+      items: itemsMap.get(r.id) || [],
+      subtotal: Number(r.subtotal),
+      discountType: r.discount_type as 'percentage' | 'value',
+      discountValue: Number(r.discount_value),
+      discountAmount: Number(r.discount_amount),
+      total: Number(r.total),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      status: r.status as 'new' | 'cancelled',
+      createdAt: r.created_at
+    }));
   }
 
   public getInvoiceById(id: string): Invoice | undefined {
-    return this.read().invoices.find(i => i.id === id);
+    const r = this.queryOne('SELECT * FROM invoices WHERE id = ?', [id]);
+    if (!r) return undefined;
+
+    const itemsRows = this.queryAll('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC', [id]);
+    const items: InvoiceItem[] = itemsRows.map(row => ({
+      serviceId: row.service_id,
+      serviceName: row.service_name,
+      quantity: Number(row.quantity),
+      price: Number(row.price),
+      total: Number(row.total)
+    }));
+
+    return {
+      id: r.id,
+      date: r.date,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      customerPhone: r.customer_phone,
+      customerAddress: r.customer_address || '',
+      items,
+      subtotal: Number(r.subtotal),
+      discountType: r.discount_type as 'percentage' | 'value',
+      discountValue: Number(r.discount_value),
+      discountAmount: Number(r.discount_amount),
+      total: Number(r.total),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      status: r.status as 'new' | 'cancelled',
+      createdAt: r.created_at
+    };
   }
 
   // Generates automatic invoice ID like HC-YYYYMM-0001
   private generateInvoiceId(dateStr: string): string {
-    const db = this.read();
     const date = new Date(dateStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const prefix = `HC-${year}${month}-`;
-    
-    // Filter invoices from the same month
-    const monthInvoices = db.invoices.filter(i => i.id.startsWith(prefix));
-    
+
+    const monthInvoices = this.queryAll<{ id: string }>('SELECT id FROM invoices WHERE id LIKE ?', [`${prefix}%`]);
     let maxNum = 0;
     monthInvoices.forEach(i => {
       const parts = i.id.split('-');
@@ -841,183 +1265,257 @@ export class JSONDatabase {
   }
 
   public createInvoice(invoiceData: Omit<Invoice, 'id' | 'createdAt'>, executor: string, ip: string, ua: string): Invoice {
-    const db = this.read();
-    
-    // 1. Auto generate invoice ID
-    const invoiceId = this.generateInvoiceId(invoiceData.date);
-    
-    // 2. Resolve Customer (auto-create or link)
-    let customerId = invoiceData.customerId;
-    const cleanPhone = invoiceData.customerPhone.trim();
-    
-    let existingCustomer = db.customers.find(c => c.phone.trim() === cleanPhone);
-    if (!existingCustomer && invoiceData.customerName) {
-      // Auto-create customer
-      const newCustomer: Customer = {
-        id: `cust-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
-        name: invoiceData.customerName,
-        phone: cleanPhone,
-        address: invoiceData.customerAddress || '',
-        notes: 'تم إنشاؤه تلقائياً عند إصدار أول فاتورة',
-        createdAt: new Date().toISOString()
+    return this.transaction(() => {
+      const invoiceId = this.generateInvoiceId(invoiceData.date);
+
+      // Resolve Customer (auto-create or link)
+      let customerId = invoiceData.customerId;
+      const cleanPhone = invoiceData.customerPhone.trim();
+
+      const existingCustomer = this.getCustomerByPhone(cleanPhone);
+      if (!existingCustomer && invoiceData.customerName) {
+        const newCustomer: Customer = {
+          id: `cust-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+          name: invoiceData.customerName,
+          phone: cleanPhone,
+          address: invoiceData.customerAddress || '',
+          notes: 'تم إنشاؤه تلقائياً عند إصدار أول فاتورة',
+          createdAt: new Date().toISOString()
+        };
+        this.run(
+          'INSERT INTO customers (id, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [newCustomer.id, newCustomer.name, newCustomer.phone, newCustomer.address, newCustomer.notes, newCustomer.createdAt]
+        );
+        customerId = newCustomer.id;
+        this.logActivity(
+          executor,
+          'إنشاء عميل تلقائي',
+          `تم إنشاء حساب عميل تلقائي ${newCustomer.name} (${newCustomer.phone}) مع الفاتورة ${invoiceId}`,
+          ip,
+          ua
+        );
+      } else if (existingCustomer) {
+        customerId = existingCustomer.id;
+        if (!existingCustomer.address && invoiceData.customerAddress) {
+          this.run('UPDATE customers SET address = ? WHERE id = ?', [invoiceData.customerAddress, existingCustomer.id]);
+        }
+      }
+
+      const createdAt = new Date().toISOString();
+      const newInvoice: Invoice = {
+        ...invoiceData,
+        id: invoiceId,
+        customerId,
+        createdAt
       };
-      db.customers.push(newCustomer);
-      customerId = newCustomer.id;
+
+      this.run(
+        'INSERT INTO invoices (id, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          newInvoice.id,
+          newInvoice.date,
+          newInvoice.customerId,
+          newInvoice.customerName,
+          newInvoice.customerPhone,
+          newInvoice.customerAddress || '',
+          newInvoice.subtotal,
+          newInvoice.discountType,
+          newInvoice.discountValue,
+          newInvoice.discountAmount,
+          newInvoice.total,
+          newInvoice.notes || '',
+          newInvoice.createdBy,
+          newInvoice.status,
+          newInvoice.createdAt
+        ]
+      );
+
+      newInvoice.items.forEach(item => {
+        this.run(
+          'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+          [newInvoice.id, item.serviceId, item.serviceName, item.quantity, item.price, item.total]
+        );
+      });
+
       this.logActivity(
         executor,
-        'إنشاء عميل تلقائي',
-        `تم إنشاء حساب عميل تلقائي ${newCustomer.name} (${newCustomer.phone}) مع الفاتورة ${invoiceId}`,
+        'إصدار فاتورة',
+        `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} جنيه مصري`,
         ip,
         ua
       );
-    } else if (existingCustomer) {
-      customerId = existingCustomer.id;
-      // Optionally update address if customer didn't have one
-      if (!existingCustomer.address && invoiceData.customerAddress) {
-        existingCustomer.address = invoiceData.customerAddress;
-      }
-    }
 
-    const newInvoice: Invoice = {
-      ...invoiceData,
-      id: invoiceId,
-      customerId,
-      createdAt: new Date().toISOString()
-    };
-
-    db.invoices.push(newInvoice);
-    this.write(db);
-
-    this.logActivity(
-      executor,
-      'إصدار فاتورة',
-      `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} جنية مصري`,
-      ip,
-      ua
-    );
-
-    return newInvoice;
+      return newInvoice;
+    });
   }
 
   public updateInvoice(id: string, invoiceData: Partial<Invoice>, executor: string, ip: string, ua: string): Invoice | null {
-    const db = this.read();
-    const index = db.invoices.findIndex(i => i.id === id);
-    if (index === -1) return null;
+    const oldInvoice = this.getInvoiceById(id);
+    if (!oldInvoice) return null;
 
-    const oldInvoice = db.invoices[index];
-    
-    // Check if locked by someone else
     const isLocked = this.isLockedByOther(id, executor);
     if (isLocked) {
       throw new Error('تعذر تعديل الفاتورة لأنها مقفلة حالياً من قبل مستخدم آخر');
     }
 
-    // Preserve immutable fields like id, createdBy, createdAt, customerId
-    const updatedInvoice: Invoice = {
-      ...oldInvoice,
-      ...invoiceData,
-      id: oldInvoice.id,
-      createdBy: oldInvoice.createdBy,
-      createdAt: oldInvoice.createdAt,
-      customerId: oldInvoice.customerId
-    };
+    return this.transaction(() => {
+      const updatedInvoice: Invoice = {
+        ...oldInvoice,
+        ...invoiceData,
+        id: oldInvoice.id,
+        createdBy: oldInvoice.createdBy,
+        createdAt: oldInvoice.createdAt,
+        customerId: oldInvoice.customerId
+      };
 
-    db.invoices[index] = updatedInvoice;
-    
-    // Release any locks held by this user on this invoice
-    db.rowLocks = db.rowLocks.filter(l => !(l.invoiceId === id && l.username === executor));
-    
-    this.write(db);
+      this.run(
+        'UPDATE invoices SET date = ?, customer_name = ?, customer_phone = ?, customer_address = ?, subtotal = ?, discount_type = ?, discount_value = ?, discount_amount = ?, total = ?, notes = ? WHERE id = ?',
+        [
+          updatedInvoice.date,
+          updatedInvoice.customerName,
+          updatedInvoice.customerPhone,
+          updatedInvoice.customerAddress || '',
+          updatedInvoice.subtotal,
+          updatedInvoice.discountType,
+          updatedInvoice.discountValue,
+          updatedInvoice.discountAmount,
+          updatedInvoice.total,
+          updatedInvoice.notes || '',
+          id
+        ]
+      );
 
-    this.logActivity(
-      executor,
-      'تعديل فاتورة',
-      `تعديل الفاتورة رقم ${id} للعميل ${updatedInvoice.customerName} - القيمة السابقة: ${oldInvoice.total} ريال، القيمة الحالية: ${updatedInvoice.total} ريال`,
-      ip,
-      ua
-    );
+      if (invoiceData.items && Array.isArray(invoiceData.items)) {
+        this.run('DELETE FROM invoice_items WHERE invoice_id = ?', [id]);
+        updatedInvoice.items.forEach(item => {
+          this.run(
+            'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, item.serviceId, item.serviceName, item.quantity, item.price, item.total]
+          );
+        });
+      }
 
-    return updatedInvoice;
+      // Release any lock held by executor on this invoice
+      this.run('DELETE FROM row_locks WHERE invoice_id = ? AND username = ?', [id, executor]);
+
+      this.logActivity(
+        executor,
+        'تعديل فاتورة',
+        `تعديل الفاتورة رقم ${id} للعميل ${updatedInvoice.customerName} - القيمة السابقة: ${oldInvoice.total} جنيه، القيمة الحالية: ${updatedInvoice.total} جنيه`,
+        ip,
+        ua
+      );
+
+      return updatedInvoice;
+    });
   }
 
   public cancelInvoice(id: string, executor: string, ip: string, ua: string): Invoice | null {
-    const db = this.read();
-    const index = db.invoices.findIndex(i => i.id === id);
-    if (index === -1) return null;
+    const invoice = this.getInvoiceById(id);
+    if (!invoice) return null;
 
-    const invoice = db.invoices[index];
-    invoice.status = 'cancelled';
-    this.write(db);
+    this.run('UPDATE invoices SET status = ? WHERE id = ?', ['cancelled', id]);
+    this.save();
 
     this.logActivity(
       executor,
       'إلغاء فاتورة',
-      `إلغاء الفاتورة رقم ${id} للعميل ${invoice.customerName} بقيمة ${invoice.total} ريال`,
+      `إلغاء الفاتورة رقم ${id} للعميل ${invoice.customerName} بقيمة ${invoice.total} جنيه`,
       ip,
       ua
     );
 
+    invoice.status = 'cancelled';
     return invoice;
   }
 
   // --- Concurrency / Row Locking Operations ---
   public acquireLock(invoiceId: string, username: string): boolean {
-    const db = this.read();
-    const now = new Date();
-    
+    const nowStr = new Date().toISOString();
     // Remove expired locks
-    db.rowLocks = db.rowLocks.filter(l => new Date(l.expiresAt) > now);
+    this.run('DELETE FROM row_locks WHERE expires_at <= ?', [nowStr]);
 
-    // Check if locked by someone else
-    const existingLock = db.rowLocks.find(l => l.invoiceId === invoiceId);
-    if (existingLock) {
-      if (existingLock.username === username) {
-        // Extend lock
-        existingLock.expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes lock
-        this.write(db);
+    const activeLock = this.queryOne<{ invoice_id: string; username: string; expires_at: string }>(
+      'SELECT * FROM row_locks WHERE invoice_id = ?',
+      [invoiceId]
+    );
+
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    if (activeLock) {
+      if (activeLock.username === username) {
+        this.run('UPDATE row_locks SET expires_at = ? WHERE invoice_id = ?', [expiresAt, invoiceId]);
+        this.save();
         return true;
       }
       return false; // Locked by someone else
     }
 
-    // Create new lock
-    db.rowLocks.push({
-      invoiceId,
-      username,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutes lock
-    });
-    this.write(db);
+    this.run('INSERT INTO row_locks (invoice_id, username, expires_at) VALUES (?, ?, ?)', [invoiceId, username, expiresAt]);
+    this.save();
     return true;
   }
 
   public releaseLock(invoiceId: string, username: string): void {
-    const db = this.read();
-    db.rowLocks = db.rowLocks.filter(l => !(l.invoiceId === invoiceId && l.username === username));
-    this.write(db);
+    this.run('DELETE FROM row_locks WHERE invoice_id = ? AND username = ?', [invoiceId, username]);
+    this.save();
   }
 
   public isLockedByOther(invoiceId: string, username: string): boolean {
-    const db = this.read();
-    const now = new Date();
-    const activeLock = db.rowLocks.find(l => l.invoiceId === invoiceId && new Date(l.expiresAt) > now);
-    return activeLock !== undefined && activeLock.username !== username;
+    const nowStr = new Date().toISOString();
+    const lock = this.queryOne<{ username: string }>(
+      'SELECT username FROM row_locks WHERE invoice_id = ? AND expires_at > ?',
+      [invoiceId, nowStr]
+    );
+    return lock !== undefined && lock.username !== username;
   }
 
   public getActiveLocks(): RowLock[] {
-    const db = this.read();
-    const now = new Date();
-    return db.rowLocks.filter(l => new Date(l.expiresAt) > now);
+    const nowStr = new Date().toISOString();
+    const rows = this.queryAll('SELECT * FROM row_locks WHERE expires_at > ?', [nowStr]);
+    return rows.map(r => ({
+      invoiceId: r.invoice_id,
+      username: r.username,
+      expiresAt: r.expires_at
+    }));
   }
 
   // --- Settings Operations ---
   public getSettings(): Settings {
-    return this.read().settings;
+    const r = this.queryOne('SELECT * FROM settings WHERE id = 1');
+    if (!r) return DEFAULT_SETTINGS;
+    return {
+      companyName: r.company_name,
+      companyNameEn: r.company_name_en || '',
+      phone: r.phone,
+      email: r.email || '',
+      address: r.address || '',
+      vatNumber: r.vat_number,
+      invoicePolicy: r.invoice_policy || '',
+      primaryColor: r.primary_color || '#0d9488',
+      secondaryColor: r.secondary_color || '#0f172a',
+      logoUrl: r.logo_url || undefined
+    };
   }
 
   public saveSettings(settings: Settings, executor: string, ip: string, ua: string): Settings {
-    const db = this.read();
-    db.settings = { ...settings };
-    this.write(db);
+    this.run(
+      'INSERT OR REPLACE INTO settings (id, company_name, company_name_en, phone, email, address, vat_number, invoice_policy, primary_color, secondary_color, logo_url) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        settings.companyName,
+        settings.companyNameEn || '',
+        settings.phone,
+        settings.email || '',
+        settings.address || '',
+        settings.vatNumber,
+        settings.invoicePolicy || '',
+        settings.primaryColor || '#0d9488',
+        settings.secondaryColor || '#0f172a',
+        settings.logoUrl || null
+      ]
+    );
+    this.save();
+
     this.logActivity(
       executor,
       'تحديث الإعدادات',
@@ -1025,63 +1523,58 @@ export class JSONDatabase {
       ip,
       ua
     );
-    return db.settings;
+    return settings;
   }
 
   // --- Activity Logs Operations ---
   public getActivityLogs(): ActivityLog[] {
-    return this.read().activityLogs;
+    const rows = this.queryAll('SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 5000');
+    return rows.map(r => ({
+      id: r.id,
+      username: r.username,
+      timestamp: r.timestamp,
+      action: r.action,
+      details: r.details,
+      ipAddress: r.ip_address,
+      userAgent: r.user_agent
+    }));
   }
 
   // --- Dashboard Data Operation ---
   public getDashboardData() {
-    const db = this.read();
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    // Customers count
-    const customersCount = db.customers.length;
+    const todayStr = now.toISOString().split('T')[0];
+    const startOfMonthStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-    // Filter invoices (excluding cancelled ones for revenue calculations)
-    const activeInvoices = db.invoices.filter(i => i.status !== 'cancelled');
-    const allInvoices = db.invoices;
+    const customersCountRow = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM customers');
+    const customersCount = customersCountRow ? customersCountRow.count : 0;
 
-    // Today's invoices (both active & all count)
-    const todayInvoices = allInvoices.filter(i => i.date.startsWith(todayStr));
-    const todayInvoicesCount = todayInvoices.length;
+    const todayCountRow = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM invoices WHERE date LIKE ?', [`${todayStr}%`]);
+    const todayInvoicesCount = todayCountRow ? todayCountRow.count : 0;
 
-    // This Month's invoices
-    const thisMonthInvoices = allInvoices.filter(i => {
-      const iDate = new Date(i.date);
-      return iDate >= startOfMonth;
-    });
-    const thisMonthInvoicesCount = thisMonthInvoices.length;
+    const monthCountRow = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM invoices WHERE date >= ?', [startOfMonthStr]);
+    const thisMonthInvoicesCount = monthCountRow ? monthCountRow.count : 0;
 
-    // Total Revenue (all non-cancelled invoices)
-    const totalRevenue = activeInvoices.reduce((sum, i) => sum + i.total, 0);
+    const totalRevRow = this.queryOne<{ sum: number }>('SELECT SUM(total) as sum FROM invoices WHERE status != ?', ['cancelled']);
+    const totalRevenue = totalRevRow && totalRevRow.sum !== null ? totalRevRow.sum : 0;
 
-    // Top services used
-    const serviceCounts: Record<string, { name: string; count: number; total: number }> = {};
-    activeInvoices.forEach(inv => {
-      inv.items.forEach(item => {
-        if (!serviceCounts[item.serviceId]) {
-          serviceCounts[item.serviceId] = { name: item.serviceName, count: 0, total: 0 };
-        }
-        serviceCounts[item.serviceId].count += item.quantity;
-        serviceCounts[item.serviceId].total += item.total;
-      });
-    });
+    const topServicesRows = this.queryAll<{ service_name: string; count: number; total: number }>(`
+      SELECT service_name, SUM(quantity) as count, SUM(invoice_items.total) as total
+      FROM invoice_items
+      JOIN invoices ON invoice_items.invoice_id = invoices.id
+      WHERE invoices.status != 'cancelled'
+      GROUP BY service_id, service_name
+      ORDER BY count DESC
+      LIMIT 5
+    `);
 
-    const topServices = Object.values(serviceCounts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const topServices = topServicesRows.map(r => ({
+      name: r.service_name,
+      count: Number(r.count),
+      total: Number(r.total)
+    }));
 
-    // Latest 10 Invoices
-    const latestInvoices = [...db.invoices]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10);
+    const latestInvoices = this.getInvoices().slice(0, 10);
 
     return {
       customersCount,
@@ -1101,10 +1594,8 @@ export class JSONDatabase {
     username?: string;
     period?: 'day' | 'week' | 'month' | 'year';
   }) {
-    const db = this.read();
-    let invoices = [...db.invoices];
+    let invoices = this.getInvoices();
 
-    // Filter by Date Range or Period
     if (filters.startDate) {
       invoices = invoices.filter(i => i.date >= filters.startDate!);
     }
@@ -1128,28 +1619,24 @@ export class JSONDatabase {
       invoices = invoices.filter(i => i.date >= borderStr);
     }
 
-    // Filter by Customer
     if (filters.customerId && filters.customerId !== 'all') {
       invoices = invoices.filter(i => i.customerId === filters.customerId);
     }
 
-    // Filter by User (Creator)
     if (filters.username && filters.username !== 'all') {
       invoices = invoices.filter(i => i.createdBy.toLowerCase() === filters.username!.toLowerCase());
     }
 
-    // Compute Summaries
     const totalInvoices = invoices.length;
     const cancelledInvoices = invoices.filter(i => i.status === 'cancelled').length;
     const activeInvoices = invoices.filter(i => i.status !== 'cancelled');
     const totalActiveCount = activeInvoices.length;
-    
+
     const subtotalSum = activeInvoices.reduce((sum, i) => sum + i.subtotal, 0);
     const discountSum = activeInvoices.reduce((sum, i) => sum + i.discountAmount, 0);
     const totalRevenueSum = activeInvoices.reduce((sum, i) => sum + i.total, 0);
-    const totalTaxSum = activeInvoices.reduce((sum, i) => sum + (i.total - i.total / 1.14), 0); // Assuming 14% Egyptian VAT is included in total
+    const totalTaxSum = activeInvoices.reduce((sum, i) => sum + (i.total - i.total / 1.14), 0);
 
-    // Grouping by Date for visual charts
     const chartDataMap: Record<string, { date: string; revenue: number; count: number }> = {};
     activeInvoices.forEach(i => {
       const dateKey = i.date;
@@ -1178,5 +1665,5 @@ export class JSONDatabase {
   }
 }
 
-// Single database instance
-export const db = new JSONDatabase();
+// Single SQLite database instance
+export const db = new SQLiteDatabase();
