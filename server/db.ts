@@ -268,6 +268,251 @@ const DEFAULT_SERVICES: Service[] = [
     defaultPrice: 100,
     description: 'سحب الدم والعينات المخبرية وتوصيلها للمختبر المعتمد مع إرسال النتائج',
     isActive: true
+  },
+  {
+    id: 'srv-9',
+    name: 'علاج صنيدارون (Sunnydarone)',
+    defaultPrice: 35,
+    description: 'دواء صنيدارون للمريض',
+    isActive: true
+  },
+  {
+    id: 'srv-10',
+    name: 'جلوكوز 25%',
+    defaultPrice: 60,
+    description: 'محلول جلوكوز تركيز 25%',
+    isActive: true
+  },
+  {
+    id: 'srv-11',
+    name: 'محلول بوتاسيوم (Potassium)',
+    defaultPrice: 30,
+    description: 'أمبول / محلول بوتاسيوم وريدي',
+    isActive: true
+  },
+  {
+    id: 'srv-12',
+    name: 'أمبول ماغنسيوم',
+    defaultPrice: 40,
+    description: 'محلول / أمبول ماغنسيوم وريدي',
+    isActive: true
+  },
+  {
+    id: 'srv-13',
+    name: 'جلوكوز 10%',
+    defaultPrice: 50,
+    description: 'محلول جلوكوز تركيز 10%',
+    isActive: true
+  },
+  {
+    id: 'srv-14',
+    name: 'زيارة طبيب استشاري منزلي',
+    defaultPrice: 2000,
+    description: 'زيارة طبيب استشاري للمنزل للمتابعة والكشف الدقيق',
+    isActive: true
+  },
+  {
+    id: 'srv-15',
+    name: 'طبيب مقيم 24 ساعة',
+    defaultPrice: 4500,
+    description: 'مرافقة طبيب مقيم بالمنزل لمتابعة الحالة على مدار 24 ساعة',
+    isActive: true
+  },
+  {
+    id: 'srv-16',
+    name: 'إيجار جهاز تنفس صناعي منزلي',
+    defaultPrice: 4000,
+    description: 'إيجار وتوفير جهاز تنفس صناعي للرعاية المنزلية',
+    isActive: true
+  },
+  {
+    id: 'srv-17',
+    name: 'تحليل غازات الدم (ABG)',
+    defaultPrice: 700,
+    description: 'سحب وعمل تحليل غازات بالدم الشرياني',
+    isActive: true
+  },
+  {
+    id: 'srv-18',
+    name: 'ملء اسطوانة أكسجين',
+    defaultPrice: 400,
+    description: 'إعادة تعبئة وملء اسطوانة الأكسجين الطبي',
+    isActive: true
+  },
+  {
+    id: 'srv-19',
+    name: 'نقل اسطوانة أكسجين',
+    defaultPrice: 450,
+    description: 'خدمة نقل وتوصيل اسطوانات الأكسجين للمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-20',
+    name: 'إيجار اسطوانة أكسجين',
+    defaultPrice: 800,
+    description: 'إيجار اسطوانة أكسجين بالمنزل مع المنظم',
+    isActive: true
+  },
+  {
+    id: 'srv-21',
+    name: 'إيجار سيرنج بمب (مضخة محاليل)',
+    defaultPrice: 1500,
+    description: 'إيجار مضخة المحاليل والأدوية الوريدية الإلكترونية',
+    isActive: true
+  },
+  {
+    id: 'srv-22',
+    name: 'إيجار سرير طبي منزلي',
+    defaultPrice: 5000,
+    description: 'إيجار سرير طبي كهربائي / يدوي للرعاية المنزلية',
+    isActive: true
+  },
+  {
+    id: 'srv-23',
+    name: 'توصيل سرير طبي',
+    defaultPrice: 500,
+    description: 'نقل وتوصيل السرير الطبي لموقع العميل',
+    isActive: true
+  },
+  {
+    id: 'srv-24',
+    name: 'نقل ومشال سرير طبي للأدوار العليا',
+    defaultPrice: 600,
+    description: 'خدمة رفع ونقل السرير الطبي للأدوار العليا',
+    isActive: true
+  },
+  {
+    id: 'srv-25',
+    name: 'رسم قلب منزلي (ECG)',
+    defaultPrice: 450,
+    description: 'عمل فحص رسم قلب كهربائي للمريض بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-26',
+    name: 'أشعة عادية على الصدر منزلي (Chest X-Ray)',
+    defaultPrice: 800,
+    description: 'تصوير أشعة سينية على الصدر بجهاز متنقل بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-27',
+    name: 'أشعة دوبلر طرف واحد',
+    defaultPrice: 2100,
+    description: 'فحص الأشعة التلفزيونية الدوبلر للأوعية الدموية بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-28',
+    name: 'تحاليل طبية منزلية عامة',
+    defaultPrice: 650,
+    description: 'مجموعة تحاليل طبية وشاملة من المنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-29',
+    name: 'تمريض منزلي 24 ساعة',
+    defaultPrice: 2000,
+    description: 'خدمة التمريض المنزلي اليومية الكاملة 24 ساعة',
+    isActive: true
+  },
+  {
+    id: 'srv-30',
+    name: 'زيارة طبيب عناية مركزة',
+    defaultPrice: 1800,
+    description: 'زيارة منزلية بواسطة أخصائي عناية مركزة للحالات الحرجة',
+    isActive: true
+  },
+  {
+    id: 'srv-31',
+    name: 'إيجار جهاز مونيتور علامات حيوية',
+    defaultPrice: 1500,
+    description: 'إيجار شاشة مراقبة نبض وضغط وأكسجين المريض بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-32',
+    name: 'توصيل وضبط أجهزة طبية',
+    defaultPrice: 120,
+    description: 'توصيل وتشغيل الأجهزة الطبية المنزلية ومعايرتها',
+    isActive: true
+  },
+  {
+    id: 'srv-33',
+    name: 'إيجار جهاز شفاط مخاط (سكشن)',
+    defaultPrice: 850,
+    description: 'إيجار جهاز شفط الإفرازات والمخاط للرعاية المنزلية',
+    isActive: true
+  },
+  {
+    id: 'srv-34',
+    name: 'تركيب قسطرة وريد مركزي (CVP)',
+    defaultPrice: 3500,
+    description: 'إجراء تركيب قسطرة الوريد المركزي بواسطة استشاري متخصص',
+    isActive: true
+  },
+  {
+    id: 'srv-35',
+    name: 'تركيب أنبوبة شق حنجري',
+    defaultPrice: 2500,
+    description: 'تركيب وتغيير أنبوبة الشق الحنجري للمريض بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-36',
+    name: 'زيارة استشاري مخ وأعصاب',
+    defaultPrice: 2200,
+    description: 'كشف واستشارة منزلية بواسطة استشاري أمراض المخ والأعصاب',
+    isActive: true
+  },
+  {
+    id: 'srv-37',
+    name: 'حقن هيبارين',
+    defaultPrice: 85,
+    description: 'إعطاء حقن الهيبارين مضاد التجلط بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-38',
+    name: 'فحص موجات صوتية على القلب (إيكو منزلي)',
+    defaultPrice: 1500,
+    description: 'فحص الإيكو للقلب بجهاز الموجات الصوتية المتنقل',
+    isActive: true
+  },
+  {
+    id: 'srv-39',
+    name: 'فحص سونار منزلي (Pectel)',
+    defaultPrice: 2000,
+    description: 'فحص أشعة السونار والتلفزيونية على البطن والحوض بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-40',
+    name: 'وصلات ومستلزمات جهاز تنفس صناعي',
+    defaultPrice: 2000,
+    description: 'توفير وصلات وفلاتر ومستلزمات جهاز التنفس المعقمة',
+    isActive: true
+  },
+  {
+    id: 'srv-41',
+    name: 'إجراء بذل بواسطة طبيب استشاري',
+    defaultPrice: 16000,
+    description: 'عملية سحب وبذل السوائل بالمنزل تحت إشراف أستاذ استشاري',
+    isActive: true
+  },
+  {
+    id: 'srv-42',
+    name: 'تركيب قسطرة بذل (Pigtail)',
+    defaultPrice: 2000,
+    description: 'تركيب قسطرة بيجتيل لسحب السوائل بالمنزل',
+    isActive: true
+  },
+  {
+    id: 'srv-43',
+    name: 'توصيل سيرنج بمب',
+    defaultPrice: 120,
+    description: 'خدمة توصيل وتشغيل جهاز سيرنج بمب',
+    isActive: true
   }
 ];
 
