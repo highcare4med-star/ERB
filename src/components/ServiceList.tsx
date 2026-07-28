@@ -211,7 +211,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
 
               {/* Default Price */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">السعر الافتراضي (ريال)</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">السعر الافتراضي (جنية مصري)</label>
                 <input
                   type="number"
                   min="0"
@@ -341,7 +341,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
                 <div className="border-t border-white/20 pt-4 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold">السعر الافتراضي للزيارة</span>
-                    <span className="text-base font-black text-slate-950 font-mono">{srv.defaultPrice.toLocaleString()} ريال</span>
+                    <span className="text-base font-black text-slate-950 font-mono">{srv.defaultPrice.toLocaleString()} جنية مصري</span>
                   </div>
 
                   {canManage && (

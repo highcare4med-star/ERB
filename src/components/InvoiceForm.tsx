@@ -71,7 +71,10 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
         serviceId: item.serviceId,
         serviceName: item.serviceName,
         quantity: item.quantity,
-        price: item.price
+        price: item.price,
+        serviceDate: item.serviceDate || editingInvoice.date,
+        serviceEndDate: item.serviceEndDate || '',
+        serviceDateType: item.serviceDateType || (item.serviceEndDate ? 'range' : 'single')
       })));
     }
   }, [editingInvoice]);
@@ -103,7 +106,18 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
 
   // Manage Invoice items
   const handleAddItemRow = () => {
-    setItems([...items, { serviceId: '', serviceName: '', quantity: 1, price: 0 }]);
+    setItems([
+      ...items,
+      {
+        serviceId: '',
+        serviceName: '',
+        quantity: 1,
+        price: 0,
+        serviceDate: date,
+        serviceEndDate: '',
+        serviceDateType: 'single'
+      }
+    ]);
   };
 
   const handleRemoveItemRow = (index: number) => {
@@ -119,15 +133,15 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
 
     const updated = [...items];
     updated[index] = {
+      ...updated[index],
       serviceId: selectedSrv.id,
       serviceName: selectedSrv.name,
-      quantity: updated[index].quantity,
       price: selectedSrv.defaultPrice
     };
     setItems(updated);
   };
 
-  const handleItemValueChange = (index: number, field: 'quantity' | 'price', value: number) => {
+  const handleItemValueChange = (index: number, field: string, value: any) => {
     const updated = [...items];
     updated[index] = {
       ...updated[index],
@@ -147,9 +161,6 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
   }
 
   const finalTotal = subtotal - discountAmount;
-  // ZATCA VAT calculations: simplified invoice amounts include 15% VAT. 
-  // VAT = total - total / 1.15
-  const vatAmount = Math.round((finalTotal - finalTotal / 1.15) * 100) / 100;
 
   // Cleanup lock on cancel
   const handleCancelAndUnlock = async () => {
@@ -248,7 +259,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Customer Phone (Autocomplete Trigger) */}
           <div className="relative">
-            <label className="block text-xs font-bold text-slate-500 mb-1">رقم الجوال (البحث أو الإدخال)</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">رقم الهاتف (البحث أو الإدخال)</label>
             <input
               type="text"
               required
@@ -256,7 +267,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
               onChange={handlePhoneChange}
               onFocus={() => customerPhone.trim().length >= 3 && setShowCustomerDropdown(true)}
               onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-              placeholder="مثال: 0500000000"
+              placeholder="مثال: 01000000000"
               className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
             />
             {/* Autocomplete Dropdown */}
@@ -299,7 +310,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
               type="text"
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              placeholder="مثال: الرياض، حي الياسمين"
+              placeholder="مثال: القاهرة، حي المعادي"
               className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
             />
           </div>
@@ -324,31 +335,24 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
               <Calculator className="h-4.5 w-4.5 text-teal-600" />
               <span>جدول الخدمات الطبية المنزلية المقدمة</span>
             </h3>
-            <button
-              type="button"
-              onClick={handleAddItemRow}
-              className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-all cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>إضافة خدمة جديدة للفاتورة</span>
-            </button>
           </div>
 
           <div className="border border-white/20 rounded-xl overflow-hidden">
             <table className="w-full text-right border-collapse text-sm">
               <thead>
                 <tr className="bg-white/10 text-slate-700 text-xs font-bold border-b border-white/10">
-                  <th className="py-3 px-4 w-1/2">الخدمة الطبية</th>
-                  <th className="py-3 px-4 w-1/12 text-center">الكمية</th>
-                  <th className="py-3 px-4 w-2/12">سعر الخدمة (ريال)</th>
-                  <th className="py-3 px-4 w-2/12 font-mono">الإجمالي الفرعي</th>
-                  <th className="py-3 px-4 w-1/12 text-center">إجراء</th>
+                  <th className="py-3 px-3 w-4/12">الخدمة الطبية</th>
+                  <th className="py-3 px-3 w-4/12">تاريخ إجراء الخدمة</th>
+                  <th className="py-3 px-3 w-1/12 text-center">الكمية</th>
+                  <th className="py-3 px-3 w-1.5/12">السعر (جنية مصري)</th>
+                  <th className="py-3 px-3 w-1.5/12 font-mono">الإجمالي الفرعي</th>
+                  <th className="py-3 px-3 w-1/12 text-center">إجراء</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-white/10 transition-colors">
-                    <td className="py-3 px-4">
+                  <tr key={idx} className="hover:bg-white/10 transition-colors align-top">
+                    <td className="py-3 px-3">
                       <select
                         required
                         value={item.serviceId}
@@ -358,12 +362,53 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         <option value="" className="bg-slate-100 text-slate-800">-- اختر الخدمة من القائمة الافتراضية --</option>
                         {services.map(srv => (
                           <option key={srv.id} value={srv.id} className="bg-slate-100 text-slate-800">
-                            {srv.name} (السعر: {srv.defaultPrice} ريال)
+                            {srv.name} (السعر: {srv.defaultPrice} جنية مصري)
                           </option>
                         ))}
                       </select>
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-3">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <select
+                            value={item.serviceDateType || 'single'}
+                            onChange={(e) => handleItemValueChange(idx, 'serviceDateType', e.target.value)}
+                            className="py-1 px-1.5 glass-input rounded text-[11px] bg-white/70 border border-slate-200 text-slate-800 font-medium"
+                          >
+                            <option value="single">تاريخ محدد</option>
+                            <option value="range">فترة (من - إلى)</option>
+                          </select>
+                        </div>
+                        
+                        {item.serviceDateType === 'range' ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              value={item.serviceDate || date}
+                              onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                              className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
+                              title="من تاريخ"
+                            />
+                            <span className="text-xs text-slate-500 font-bold">إلى</span>
+                            <input
+                              type="date"
+                              value={item.serviceEndDate || ''}
+                              onChange={(e) => handleItemValueChange(idx, 'serviceEndDate', e.target.value)}
+                              className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
+                              title="إلى تاريخ"
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="date"
+                            value={item.serviceDate || date}
+                            onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                            className="py-1 px-2 glass-input rounded-lg text-xs w-full text-center font-mono"
+                          />
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-center">
                       <input
                         type="number"
                         min="1"
@@ -373,7 +418,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         className="block w-full py-1 px-2 glass-input rounded-lg text-center text-xs focus:outline-none"
                       />
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-3">
                       <input
                         type="number"
                         min="0"
@@ -384,10 +429,10 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         className="block w-full py-1 px-2 glass-input rounded-lg text-xs focus:outline-none"
                       />
                     </td>
-                    <td className="py-3 px-4 font-bold text-slate-800 font-mono">
-                      {(item.price * item.quantity).toLocaleString()} ريال
+                    <td className="py-3 px-3 font-bold text-slate-800 font-mono text-xs pt-4">
+                      {(item.price * item.quantity).toLocaleString()} جنية مصري
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-3 text-center pt-3.5">
                       <button
                         type="button"
                         onClick={() => handleRemoveItemRow(idx)}
@@ -402,6 +447,18 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Add service button positioned directly below the table */}
+          <div className="flex justify-start pt-1">
+            <button
+              type="button"
+              onClick={handleAddItemRow}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-50 hover:bg-teal-100/90 border border-teal-200/80 text-teal-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              <Plus className="h-4 w-4 text-teal-600" />
+              <span>إضافة خدمة جديدة للفاتورة</span>
+            </button>
           </div>
         </div>
 
@@ -423,7 +480,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             <div className="glass-card rounded-xl p-4 shadow-sm flex items-start gap-2.5">
               <Heart className="h-4.5 w-4.5 text-teal-600 shrink-0 mt-0.5" />
               <div className="text-[11px] text-teal-800 leading-relaxed font-sans font-semibold">
-                <span className="font-bold">سياسة e-Invoicing:</span> نظام هاي كير يدعم إصدار الفاتورة الإلكترونية المبسطة المتوافقة بالكامل مع هيئة الزكاة والضريبة والجمارك (ZATCA). يتم توليد رمز الاستجابة السريعة (QR) المشفر بصيغة TLV تلقائياً بمجرد حفظ الفاتورة لضمان الامتثال القانوني.
+                <span className="font-bold">سياسة الفواتير الرقمية:</span> نظام هاي كير يدعم إصدار الفاتورة الإلكترونية المتوافقة بالكامل مع قوانين مصلحة الضرائب المصرية. يتم توليد رمز الاستجابة السريعة (QR) تلقائياً بمجرد حفظ الفاتورة لضمان الامتثال القانوني.
               </div>
             </div>
           </div>
@@ -435,7 +492,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             <div className="space-y-3 divide-y divide-white/10 text-sm">
               <div className="flex justify-between items-center">
                 <span className="text-slate-600 font-semibold">الإجمالي الفرعي:</span>
-                <span className="font-semibold font-mono text-slate-900">{subtotal.toLocaleString()} ريال</span>
+                <span className="font-semibold font-mono text-slate-900">{subtotal.toLocaleString()} جنية مصري</span>
               </div>
 
               {/* Discount inputs */}
@@ -448,7 +505,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                       onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'value')}
                       className="glass-input rounded py-0.5 px-1 text-xs focus:outline-none"
                     >
-                      <option value="value" className="bg-slate-100 text-slate-800">ريال</option>
+                      <option value="value" className="bg-slate-100 text-slate-800">جنية مصري</option>
                       <option value="percentage" className="bg-slate-100 text-slate-800">٪</option>
                     </select>
                     <input
@@ -463,20 +520,15 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                 </div>
                 {discountAmount > 0 && (
                   <p className="text-[10px] text-red-600 font-semibold text-left">
-                    قيمة الخصم المقتطعة: {discountAmount.toLocaleString()} ريال
+                    قيمة الخصم المقتطعة: {discountAmount.toLocaleString()} جنية مصري
                   </p>
                 )}
               </div>
 
               {/* Final totals */}
               <div className="pt-3 flex justify-between items-center text-slate-900 font-bold">
-                <span>الإجمالي النهائي (شامل الضريبة):</span>
-                <span className="text-lg font-extrabold text-teal-700 font-mono">{finalTotal.toLocaleString()} ريال</span>
-              </div>
-
-              <div className="pt-3 flex justify-between items-center text-xs text-slate-500 font-semibold">
-                <span>ضريبة القيمة المضافة المشمولة (15%):</span>
-                <span className="font-semibold font-mono">{vatAmount.toLocaleString()} ريال</span>
+                <span>الإجمالي النهائي المستحق:</span>
+                <span className="text-lg font-extrabold text-teal-700 font-mono">{finalTotal.toLocaleString()} جنية مصري</span>
               </div>
             </div>
           </div>

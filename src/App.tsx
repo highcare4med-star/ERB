@@ -244,12 +244,15 @@ export default function App() {
       <aside className="hidden lg:flex flex-col w-64 glass-sidebar shrink-0 select-none print:hidden">
         {/* Brand Header */}
         <div className="p-6 border-b border-white/10 flex items-center gap-3">
-          <div className="h-10 w-10 bg-teal-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-teal-950/20">
-            <Heart className="h-6 w-6 text-white fill-white" />
-          </div>
+          <img 
+            src="/logo.jpg" 
+            alt="High Care Logo" 
+            className="h-11 w-11 object-contain rounded-xl bg-white p-0.5 shadow-md shadow-slate-950/20"
+            referrerPolicy="no-referrer"
+          />
           <div>
-            <h1 className="font-extrabold text-sm text-white tracking-tight leading-normal">شركة هاي كير</h1>
-            <p className="text-[10px] text-slate-400 tracking-wider font-semibold font-mono">HI CARE SYSTEM</p>
+            <h1 className="font-extrabold text-sm text-white tracking-tight leading-normal">شركة هاي كير بمصر</h1>
+            <p className="text-[10px] text-teal-300 tracking-wider font-semibold font-mono">HIGH CARE EGYPT</p>
           </div>
         </div>
 
@@ -318,13 +321,13 @@ export default function App() {
 
             <div className="flex items-center gap-2 text-slate-500 text-xs">
               <span className="font-bold text-slate-800">الفرع الرئيسي:</span>
-              <span>الرياض، السعودية</span>
+              <span>القاهرة، مصر</span>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="text-xs font-bold text-slate-600 bg-white/30 backdrop-blur-sm py-1.5 px-3 rounded-full border border-white/40">
-              {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
           </div>
         </header>

@@ -178,7 +178,7 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
               ) : (
                 <div className="flex items-center gap-2 mt-2">
                   <h3 className="text-2xl font-extrabold text-slate-950 font-mono">
-                    {showRevenue ? `${data.totalRevenue.toLocaleString('ar-SA')} ريال` : '•••••••'}
+                    {showRevenue ? `${data.totalRevenue.toLocaleString('ar-EG')} جنية مصري` : '•••••••'}
                   </h3>
                   <button 
                     onClick={() => setShowRevenue(!showRevenue)}
@@ -227,7 +227,7 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
                     <div key={inv.id} className="flex-1 flex flex-col items-center group relative">
                       {/* Tooltip on hover */}
                       <div className="absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 font-mono">
-                        {inv.total} ريال
+                        {inv.total} جنية مصري
                       </div>
                       
                       {/* Visual Bar */}
@@ -286,7 +286,7 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
                         />
                       </div>
                       <p className="text-[10px] font-mono text-slate-400 text-left">
-                        {srv.total.toLocaleString('ar-SA')} ريال
+                        {srv.total.toLocaleString('ar-EG')} جنية مصري
                       </p>
                     </div>
                   );
@@ -345,7 +345,7 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
                     <td className="py-3.5 px-6 font-semibold text-slate-800">{inv.customerName}</td>
                     <td className="py-3.5 px-6 text-slate-500 font-mono">{inv.customerPhone}</td>
                     <td className="py-3.5 px-6 text-slate-500">{inv.createdBy}</td>
-                    <td className="py-3.5 px-6 font-bold text-slate-900 font-mono">{inv.total.toLocaleString()} ريال</td>
+                    <td className="py-3.5 px-6 font-bold text-slate-900 font-mono">{inv.total.toLocaleString()} جنية مصري</td>
                     <td className="py-3.5 px-6 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                         inv.status === 'new' 

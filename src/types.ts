@@ -38,6 +38,9 @@ export interface InvoiceItem {
   quantity: number;
   price: number;
   total: number;
+  serviceDate?: string;
+  serviceEndDate?: string;
+  serviceDateType?: 'single' | 'range';
 }
 
 export interface Invoice {

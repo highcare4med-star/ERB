@@ -1,0 +1,391 @@
+{
+  "users": [
+    {
+      "id": "user-admin",
+      "username": "admin",
+      "passwordHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+      "fullName": "مدير النظام الرئيسي",
+      "roleId": "admin",
+      "isActive": true,
+      "createdAt": "2026-07-28T20:31:47.695Z"
+    },
+    {
+      "id": "user-financial",
+      "username": "financial",
+      "passwordHash": "7c3d4b31e62ecad4f49c5800d42fcc648656a9e2b7dce47b1e63b35c2681bda8",
+      "fullName": "أحمد المالي",
+      "roleId": "financial",
+      "isActive": true,
+      "createdAt": "2026-07-28T20:31:47.695Z"
+    },
+    {
+      "id": "user-billing",
+      "username": "billing",
+      "passwordHash": "05ae4d77852d7795c8ea0999fa8110181174db49072ddb026ef9bc3844cf6867",
+      "fullName": "سعيد الفواتير",
+      "roleId": "billing",
+      "isActive": true,
+      "createdAt": "2026-07-28T20:31:47.695Z"
+    },
+    {
+      "id": "user-readonly",
+      "username": "readonly",
+      "passwordHash": "8877c58975fc1f061338418bc0424b5b08c95ff412dc08a68cfa879f45dbbf10",
+      "fullName": "خالد الزائر",
+      "roleId": "readonly",
+      "isActive": true,
+      "createdAt": "2026-07-28T20:31:47.695Z"
+    }
+  ],
+  "roles": [
+    {
+      "id": "admin",
+      "name": "Admin",
+      "nameAr": "مدير النظام",
+      "description": "صلاحيات كاملة للتحكم في النظام والمستخدمين والتقارير",
+      "permissions": [
+        "create_invoice",
+        "edit_invoice",
+        "cancel_invoice",
+        "view_invoices",
+        "print_pdf",
+        "send_whatsapp",
+        "manage_services",
+        "manage_customers",
+        "manage_users",
+        "view_reports",
+        "view_logs",
+        "manage_settings"
+      ]
+    },
+    {
+      "id": "financial",
+      "name": "Financial Manager",
+      "nameAr": "المدير المالي",
+      "description": "عرض الفواتير والتقارير وإدارة الخدمات والعملاء وسجل العمليات دون إدارة المستخدمين",
+      "permissions": [
+        "view_invoices",
+        "print_pdf",
+        "send_whatsapp",
+        "manage_services",
+        "manage_customers",
+        "view_reports",
+        "view_logs"
+      ]
+    },
+    {
+      "id": "billing",
+      "name": "Billing Officer",
+      "nameAr": "موظف إصدار فواتير",
+      "description": "إنشاء وتعديل الفواتير وإدارة الخدمات والعملاء دون صلاحيات الإلغاء أو الإعدادات",
+      "permissions": [
+        "create_invoice",
+        "edit_invoice",
+        "view_invoices",
+        "print_pdf",
+        "send_whatsapp",
+        "manage_customers"
+      ]
+    },
+    {
+      "id": "readonly",
+      "name": "Read Only",
+      "nameAr": "موظف قراءة فقط",
+      "description": "استعراض الفواتير وطباعتها فقط دون إمكانية الإضافة أو التعديل",
+      "permissions": [
+        "view_invoices",
+        "print_pdf"
+      ]
+    }
+  ],
+  "customers": [
+    {
+      "id": "cust-1785270922854-5b6996",
+      "name": "تتتتتت",
+      "phone": "09999",
+      "address": "",
+      "notes": "تم إنشاؤه تلقائياً عند إصدار أول فاتورة",
+      "createdAt": "2026-07-28T20:35:22.854Z"
+    },
+    {
+      "id": "cust-1785271355678-710d2a",
+      "name": "ااتاتا",
+      "phone": "7787878",
+      "address": "",
+      "notes": "تم إنشاؤه تلقائياً عند إصدار أول فاتورة",
+      "createdAt": "2026-07-28T20:42:35.678Z"
+    },
+    {
+      "id": "cust-1785271771754-1512ea",
+      "name": "تنتا",
+      "phone": "698798",
+      "address": "",
+      "notes": "تم إنشاؤه تلقائياً عند إصدار أول فاتورة",
+      "createdAt": "2026-07-28T20:49:31.754Z"
+    }
+  ],
+  "services": [
+    {
+      "id": "srv-1",
+      "name": "زيارة طبيب منزلية للكشف العام",
+      "defaultPrice": 300,
+      "description": "زيارة طبيب عام للمنزل للكشف السريري وتشخيص الحالة وتحديد الخطة العلاجية",
+      "isActive": true
+    },
+    {
+      "id": "srv-2",
+      "name": "جلسة علاج طبيعي منزلي (60 دقيقة)",
+      "defaultPrice": 200,
+      "description": "جلسة إعادة تأهيل وعلاج طبيعي منزلي بواسطة أخصائيين مؤهلين",
+      "isActive": true
+    },
+    {
+      "id": "srv-3",
+      "name": "رعاية تمريضية منزلية - نوبة 12 ساعة",
+      "defaultPrice": 500,
+      "description": "مرافقة تمريضية منزلية متكاملة تشمل قياس العلامات الحيوية وإعطاء الأدوية",
+      "isActive": true
+    },
+    {
+      "id": "srv-4",
+      "name": "رعاية تمريضية منزلية - نوبة 24 ساعة",
+      "defaultPrice": 900,
+      "description": "رعاية تمريضية على مدار الساعة لخدمة الحالات الحرجة ومتابعة المرضى",
+      "isActive": true
+    },
+    {
+      "id": "srv-5",
+      "name": "رعاية كبار السن المنزلية اليومية",
+      "defaultPrice": 400,
+      "description": "تقديم العناية الشخصية اليومية والمساعدة المعيشية والنفسية للمسنين في منازلهم",
+      "isActive": true
+    },
+    {
+      "id": "srv-6",
+      "name": "رعاية الأطفال وحديثي الولادة المنزلية",
+      "defaultPrice": 350,
+      "description": "عناية تمريضية ورعاية شاملة للأطفال وحديثي الولادة والخدج تحت إشراف متخصص",
+      "isActive": true
+    },
+    {
+      "id": "srv-7",
+      "name": "تركيب مغذي ومحلول وريدي منزلي",
+      "defaultPrice": 150,
+      "description": "تركيب الكانيولا وإعطاء المحاليل الطبية والوريدية الموصوفة من الطبيب بالمنزل",
+      "isActive": true
+    },
+    {
+      "id": "srv-8",
+      "name": "سحب عينات تحاليل مخبرية منزلية",
+      "defaultPrice": 100,
+      "description": "سحب الدم والعينات المخبرية وتوصيلها للمختبر المعتمد مع إرسال النتائج",
+      "isActive": true
+    }
+  ],
+  "invoices": [
+    {
+      "date": "2026-07-28",
+      "customerId": "cust-1785270922854-5b6996",
+      "customerName": "تتتتتت",
+      "customerPhone": "09999",
+      "customerAddress": "",
+      "items": [
+        {
+          "serviceId": "srv-1",
+          "serviceName": "زيارة طبيب منزلية للكشف العام",
+          "quantity": 1,
+          "price": 300,
+          "total": 300
+        },
+        {
+          "serviceId": "srv-7",
+          "serviceName": "تركيب مغذي ومحلول وريدي منزلي",
+          "quantity": 1,
+          "price": 150,
+          "total": 150
+        },
+        {
+          "serviceId": "srv-2",
+          "serviceName": "جلسة علاج طبيعي منزلي (60 دقيقة)",
+          "quantity": 1,
+          "price": 200,
+          "total": 200
+        },
+        {
+          "serviceId": "srv-3",
+          "serviceName": "رعاية تمريضية منزلية - نوبة 12 ساعة",
+          "quantity": 1,
+          "price": 500,
+          "total": 500
+        }
+      ],
+      "subtotal": 1150,
+      "discountType": "value",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 1150,
+      "notes": "",
+      "createdBy": "admin",
+      "status": "new",
+      "id": "HC-202607-0001",
+      "createdAt": "2026-07-28T20:35:22.854Z"
+    },
+    {
+      "date": "2026-07-28",
+      "customerId": "cust-1785271355678-710d2a",
+      "customerName": "ااتاتا",
+      "customerPhone": "7787878",
+      "customerAddress": "",
+      "items": [
+        {
+          "serviceId": "srv-1",
+          "serviceName": "زيارة طبيب منزلية للكشف العام",
+          "quantity": 1,
+          "price": 300,
+          "total": 300
+        }
+      ],
+      "subtotal": 300,
+      "discountType": "value",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 300,
+      "notes": "",
+      "createdBy": "admin",
+      "status": "new",
+      "id": "HC-202607-0002",
+      "createdAt": "2026-07-28T20:42:35.678Z"
+    },
+    {
+      "date": "2026-07-28",
+      "customerId": "cust-1785271771754-1512ea",
+      "customerName": "تنتا",
+      "customerPhone": "698798",
+      "customerAddress": "",
+      "items": [
+        {
+          "serviceId": "srv-1",
+          "serviceName": "زيارة طبيب منزلية للكشف العام",
+          "quantity": 1,
+          "price": 300,
+          "total": 300
+        }
+      ],
+      "subtotal": 300,
+      "discountType": "value",
+      "discountValue": 0,
+      "discountAmount": 0,
+      "total": 300,
+      "notes": "",
+      "createdBy": "admin",
+      "status": "new",
+      "id": "HC-202607-0003",
+      "createdAt": "2026-07-28T20:49:31.755Z"
+    }
+  ],
+  "activityLogs": [
+    {
+      "id": "log-1785271771755-bb558db6",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:49:31.755Z",
+      "action": "إصدار فاتورة",
+      "details": "إصدار فاتورة جديدة رقم HC-202607-0003 للعميل تنتا بقيمة إجمالية 300 جنية مصري",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785271771754-40d663ee",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:49:31.754Z",
+      "action": "إنشاء عميل تلقائي",
+      "details": "تم إنشاء حساب عميل تلقائي تنتا (698798) مع الفاتورة HC-202607-0003",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785271746871-bbb22d1a",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:49:06.871Z",
+      "action": "تسجيل دخول",
+      "details": "تم تسجيل الدخول إلى النظام بنجاح",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785271355678-f355fe5e",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:42:35.679Z",
+      "action": "إصدار فاتورة",
+      "details": "إصدار فاتورة جديدة رقم HC-202607-0002 للعميل ااتاتا بقيمة إجمالية 300 جنية مصري",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785271355678-6531efcc",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:42:35.678Z",
+      "action": "إنشاء عميل تلقائي",
+      "details": "تم إنشاء حساب عميل تلقائي ااتاتا (7787878) مع الفاتورة HC-202607-0002",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785271332229-8433218a",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:42:12.229Z",
+      "action": "تسجيل دخول",
+      "details": "تم تسجيل الدخول إلى النظام بنجاح",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785270922854-be36a83b",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:35:22.854Z",
+      "action": "إصدار فاتورة",
+      "details": "إصدار فاتورة جديدة رقم HC-202607-0001 للعميل تتتتتت بقيمة إجمالية 1150 ريال",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785270922854-fdcd3042",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:35:22.854Z",
+      "action": "إنشاء عميل تلقائي",
+      "details": "تم إنشاء حساب عميل تلقائي تتتتتت (09999) مع الفاتورة HC-202607-0001",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-1785270729555-342f7cdb",
+      "username": "admin",
+      "timestamp": "2026-07-28T20:32:09.555Z",
+      "action": "تسجيل دخول",
+      "details": "تم تسجيل الدخول إلى النظام بنجاح",
+      "ipAddress": "156.217.144.182, 169.254.169.126",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "log-init",
+      "username": "system",
+      "timestamp": "2026-07-28T20:31:47.695Z",
+      "action": "تهيئة النظام",
+      "details": "تم إنشاء قاعدة البيانات وتهيئة الحسابات والخدمات الافتراضية بنجاح",
+      "ipAddress": "127.0.0.1",
+      "userAgent": "System Initializer"
+    }
+  ],
+  "settings": {
+    "companyName": "هاي كير للخدمات الطبية المنزلية بمصر",
+    "companyNameEn": "High Care Home Medical Services - Egypt",
+    "phone": "+201000000000",
+    "email": "info@hicare.eg",
+    "address": "القاهرة، جمهورية مصر العربية",
+    "vatNumber": "123-456-789",
+    "invoicePolicy": "تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.",
+    "primaryColor": "#0d9488",
+    "secondaryColor": "#0f172a",
+    "logoUrl": "/logo.jpg"
+  },
+  "rowLocks": []
+}

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Printer, MessageCircle, ArrowLeft, Heart, CheckCircle2, ShieldCheck, Mail, Phone, MapPin } from 'lucide-react';
+import { Printer, MessageCircle, ArrowLeft, Download, FileText } from 'lucide-react';
 import { Invoice, Settings } from '../types';
-import { generateZATCABase64, getZATCAQRImageUrl } from '../utils/zatca';
 
 interface InvoicePrintProps {
   token: string;
@@ -13,6 +12,9 @@ interface InvoicePrintProps {
 export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintProps) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [sharingWhatsapp, setSharingWhatsapp] = useState(false);
+  const [whatsappNotice, setWhatsappNotice] = useState<string | null>(null);
 
   // Fetch company settings to populate invoice header
   useEffect(() => {
@@ -33,37 +35,218 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
   }, [token]);
 
   const handlePrint = () => {
+    // Trigger standard browser print window
     window.print();
   };
 
-  const getWhatsAppLink = () => {
+  const getPdfOptions = () => ({
+    margin: 6,
+    filename: `فاتورة_هاي_كير_${invoice?.id || 'HC'}.pdf`,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      onclone: (clonedDoc: Document) => {
+        const origEl = document.getElementById('printable-invoice');
+        const clonedEl = clonedDoc.getElementById('printable-invoice');
+
+        if (origEl && clonedEl) {
+          const propsToCopy = [
+            'color',
+            'background-color',
+            'border-top-color',
+            'border-bottom-color',
+            'border-left-color',
+            'border-right-color',
+            'border-top-width',
+            'border-bottom-width',
+            'border-left-width',
+            'border-right-width',
+            'border-top-style',
+            'border-bottom-style',
+            'border-left-style',
+            'border-right-style',
+            'border-top-left-radius',
+            'border-top-right-radius',
+            'border-bottom-left-radius',
+            'border-bottom-right-radius',
+            'border-collapse',
+            'border-spacing',
+            'font-size',
+            'font-weight',
+            'font-family',
+            'line-height',
+            'font-style',
+            'text-align',
+            'direction',
+            'padding-top',
+            'padding-bottom',
+            'padding-left',
+            'padding-right',
+            'margin-top',
+            'margin-bottom',
+            'margin-left',
+            'margin-right',
+            'display',
+            'flex-direction',
+            'align-items',
+            'justify-content',
+            'grid-template-columns',
+            'gap',
+            'row-gap',
+            'column-gap',
+            'width',
+            'height',
+            'max-width',
+            'min-width',
+            'box-sizing',
+            'vertical-align',
+            'overflow'
+          ];
+
+          const origNodes = [origEl, ...Array.from(origEl.querySelectorAll('*'))] as HTMLElement[];
+          const cloneNodes = [clonedEl, ...Array.from(clonedEl.querySelectorAll('*'))] as HTMLElement[];
+
+          origNodes.forEach((node, idx) => {
+            const cloneNode = cloneNodes[idx];
+            if (!cloneNode || !cloneNode.style) return;
+            try {
+              const computed = window.getComputedStyle(node);
+              propsToCopy.forEach((prop) => {
+                const val = computed.getPropertyValue(prop);
+                if (val) {
+                  cloneNode.style.setProperty(prop, val);
+                }
+              });
+              cloneNode.style.boxShadow = 'none';
+            } catch {
+              // Ignore elements without computed style
+            }
+          });
+
+          // Ensure main container styling
+          clonedEl.style.width = '800px';
+          clonedEl.style.maxWidth = '800px';
+          clonedEl.style.backgroundColor = '#ffffff';
+          clonedEl.style.padding = '32px';
+          clonedEl.style.boxSizing = 'border-box';
+          clonedEl.style.direction = 'rtl';
+          clonedEl.style.textAlign = 'right';
+          clonedEl.style.border = '1px solid #a7f3d0';
+          clonedEl.style.borderRadius = '12px';
+
+          // Remove all stylesheets from cloned document so html2canvas never sees raw Tailwind v4 oklch rules
+          const stylesheets = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+          stylesheets.forEach((sheet) => sheet.remove());
+        }
+      }
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+  });
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('printable-invoice');
+    if (!element) return;
+    setDownloadingPdf(true);
+    try {
+      // @ts-ignore
+      const html2pdfModule = (await import('html2pdf.js')).default;
+      const opt = getPdfOptions();
+      await html2pdfModule().set(opt).from(element).save();
+    } catch (err) {
+      console.error('Error generating PDF with html2pdf:', err);
+      window.print();
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const getWhatsAppUrl = () => {
     if (!invoice) return '#';
     
-    const companyName = settings?.companyName || 'هاي كير للخدمات الطبية المنزلية';
-    
-    // Build custom professional Arabic text for WhatsApp dispatch
-    const text = `عزيزنا العميل *${invoice.customerName}*، 🌸
-يسعدنا خدمتكم في *${companyName}*.
+    // Short concise WhatsApp message
+    const text = `فاتورة طبية - شركة High Care 📄
+رقم الفاتورة: ${invoice.id}
+العميل: ${invoice.customerName}
+المبلغ المستحق: ${invoice.total.toLocaleString()} جنية مصري
 
-تم إصدار الفاتورة الطبية الخاصة بكم بتفاصيل الخدمات المقدمة:
-📄 *رقم الفاتورة:* ${invoice.id}
-📅 *التاريخ:* ${invoice.date}
-💰 *إجمالي الفاتورة:* ${invoice.total.toLocaleString()} ريال (شامل ضريبة القيمة المضافة 15٪)
+شكرًا لاختياركم شركة High Care للخدمات الطبية المنزلية.`;
 
-📥 *يمكنكم استعراض الفاتورة والاحتفاظ بنسخة للطباعة عبر الرابط المعتمد:*
-${window.location.origin}/print/${invoice.id}
-
-نتمنى لكم دوام الصحة والعافية. 🩺💚`;
-
-    // Ensure phone is in international format if starts with 05
     let cleanPhone = invoice.customerPhone.trim();
-    if (cleanPhone.startsWith('05')) {
+    if (cleanPhone.startsWith('01')) {
+      cleanPhone = '20' + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith('05')) {
       cleanPhone = '966' + cleanPhone.slice(1);
     } else if (cleanPhone.startsWith('+')) {
       cleanPhone = cleanPhone.replace('+', '');
+    } else if (cleanPhone.startsWith('0')) {
+      cleanPhone = '20' + cleanPhone.slice(1);
     }
 
     return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
+  };
+
+  const handleShareWhatsApp = async () => {
+    const element = document.getElementById('printable-invoice');
+    if (!element || !invoice) return;
+
+    setSharingWhatsapp(true);
+    setWhatsappNotice(null);
+
+    const waUrl = getWhatsAppUrl();
+
+    try {
+      // @ts-ignore
+      const html2pdfModule = (await import('html2pdf.js')).default;
+      const opt = getPdfOptions();
+
+      // Generate PDF blob
+      const pdfWorker = html2pdfModule().set(opt).from(element);
+      const pdfBlob: Blob = await pdfWorker.output('blob');
+
+      const fileName = `فاتورة_هاي_كير_${invoice.id}.pdf`;
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      // Try Web Share API with File payload (Supported on Mobile browsers like iOS Safari / Chrome Android)
+      if (
+        navigator.canShare &&
+        navigator.canShare({ files: [pdfFile] })
+      ) {
+        try {
+          await navigator.share({
+            files: [pdfFile],
+            title: `فاتورة طبية ${invoice.id}`,
+            text: `فاتورة طبية - شركة High Care 📄\nرقم الفاتورة: ${invoice.id}\nالعميل: ${invoice.customerName}\nالمبلغ: ${invoice.total.toLocaleString()} جنية مصري`
+          });
+          setSharingWhatsapp(false);
+          return;
+        } catch (shareErr: any) {
+          if (shareErr.name === 'AbortError') {
+            setSharingWhatsapp(false);
+            return;
+          }
+          console.log('Web Share API file share failed, falling back to download + open link', shareErr);
+        }
+      }
+
+      // Fallback: Save PDF directly to user's downloads folder
+      await html2pdfModule().set(opt).from(element).save();
+
+      // Open WhatsApp chat in new window
+      window.open(waUrl, '_blank');
+
+      // Display alert notice to instruct user
+      setWhatsappNotice(
+        `تم تنزيل ملف الفاتورة PDF بنجاح (${fileName})! يمكنك الآن إرفاقه في محادثة الواتساب المفتوحة.`
+      );
+    } catch (err) {
+      console.error('Error generating PDF for WhatsApp:', err);
+      window.open(waUrl, '_blank');
+    } finally {
+      setSharingWhatsapp(false);
+    }
   };
 
   if (loading) {
@@ -76,32 +259,15 @@ ${window.location.origin}/print/${invoice.id}
   }
 
   const company = settings || {
-    companyName: 'هاي كير للخدمات الطبية المنزلية',
-    companyNameEn: 'Hi Care Home Medical Services',
-    phone: '+966500000000',
-    email: 'info@hicare.sa',
-    address: 'الرياض، المملكة العربية السعودية',
-    vatNumber: '310123456789003',
-    invoicePolicy: 'الأسعار تشمل ضريبة القيمة المضافة 15%'
+    companyName: 'هاي كير للخدمات الطبية المنزلية بمصر',
+    companyNameEn: 'High Care Home Medical Services - Egypt',
+    phone: '+201000000000',
+    email: 'info@hicare.eg',
+    address: 'القاهرة، جمهورية مصر العربية',
+    vatNumber: '123-456-789',
+    invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.',
+    logoUrl: '/logo.jpg'
   };
-
-  // Generate ZATCA base64 encoded TLV string for QR Code
-  // Simplified tax invoice requirements require tag 1, 2, 3, 4, 5
-  // VAT Amount is total - total / 1.15
-  const invoiceVat = Math.round((invoice.total - invoice.total / 1.15) * 100) / 100;
-  
-  // Format invoice timestamp. Since we only have 'date' (YYYY-MM-DD), we append a generic 12:00:00 timestamp for Saudi ZATCA scan compliance.
-  const timestampIso = `${invoice.date}T12:00:00Z`;
-  
-  const zatcaBase64 = generateZATCABase64(
-    company.companyName,
-    company.vatNumber,
-    timestampIso,
-    invoice.total.toFixed(2),
-    invoiceVat.toFixed(2)
-  );
-
-  const qrImageUrl = getZATCAQRImageUrl(zatcaBase64);
 
   return (
     <div className="space-y-6 font-sans text-slate-800" dir="rtl">
@@ -115,17 +281,36 @@ ${window.location.origin}/print/${invoice.id}
           <span>العودة لسجل الفواتير</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          {/* Send via WhatsApp */}
-          <a
-            href={getWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Download PDF button */}
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+            title="تحميل الفاتورة مباشرة بصيغة PDF"
           >
-            <MessageCircle className="h-4.5 w-4.5" />
-            <span>إرسال وتذكير عبر واتساب</span>
-          </a>
+            {downloadingPdf ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download className="h-4.5 w-4.5" />
+            )}
+            <span>{downloadingPdf ? 'جاري التحميل...' : 'تنزيل PDF'}</span>
+          </button>
+
+          {/* Send via WhatsApp */}
+          <button
+            onClick={handleShareWhatsApp}
+            disabled={sharingWhatsapp}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+            title="مشاركة الفاتورة بصيغة PDF مباشرة عبر واتساب"
+          >
+            {sharingWhatsapp ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <MessageCircle className="h-4.5 w-4.5" />
+            )}
+            <span>{sharingWhatsapp ? 'جاري تجهيز الفاتورة...' : 'إرسال الفاتورة (PDF) عبر واتساب'}</span>
+          </button>
 
           {/* Trigger browser print layout */}
           <button
@@ -133,26 +318,48 @@ ${window.location.origin}/print/${invoice.id}
             className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all cursor-pointer"
           >
             <Printer className="h-4.5 w-4.5" />
-            <span>طباعة وتنزيل PDF (A4)</span>
+            <span>طباعة الفاتورة</span>
           </button>
         </div>
       </div>
 
+      {whatsappNotice && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3.5 rounded-xl flex items-center justify-between gap-3 shadow-sm print:hidden">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">📄</span>
+            <span className="font-semibold">{whatsappNotice}</span>
+          </div>
+          <button
+            onClick={() => setWhatsappNotice(null)}
+            className="text-emerald-600 hover:text-emerald-900 font-bold text-xs px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 transition-colors"
+          >
+            إغلاق
+          </button>
+        </div>
+      )}
+
       {/* Main Printable A4 Container */}
-      <div className="bg-white border border-slate-100 shadow-lg rounded-2xl max-w-4xl mx-auto p-8 sm:p-12 print:border-none print:shadow-none print:p-0 print:m-0 font-sans">
-        
+      <div 
+        id="printable-invoice"
+        dir="rtl"
+        className="bg-white border border-emerald-200 shadow-lg rounded-xl max-w-3xl mx-auto p-6 sm:p-8 print:border-none print:shadow-none print:p-0 print:m-0 font-sans text-right"
+        style={{ direction: 'rtl', textAlign: 'right' }}
+      >
         {/* Style block dedicated to Print stylesheet overrides */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            body {
+            html, body, #root {
               background-color: white !important;
+              background-image: none !important;
               color: black !important;
               font-size: 12px !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              height: auto !important;
+              overflow: visible !important;
+              direction: rtl !important;
             }
-            .print\\:hidden {
-              display: none !important;
-            }
-            header, footer, nav, sidebar, .navbar, .no-print {
+            .print\\:hidden, nav, header, aside, .glass-sidebar, .glass-header {
               display: none !important;
             }
             .print\\:m-0 {
@@ -167,7 +374,6 @@ ${window.location.origin}/print/${invoice.id}
             .print\\:shadow-none {
               box-shadow: none !important;
             }
-            /* Avoid page breaks inside invoice elements */
             .invoice-card {
               page-break-inside: avoid;
             }
@@ -175,162 +381,126 @@ ${window.location.origin}/print/${invoice.id}
         `}} />
 
         {/* Invoice Card structure for Print optimization */}
-        <div className="invoice-card space-y-8">
-          {/* Company Header Block */}
-          <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-slate-100 pb-6 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 bg-teal-600 rounded-xl flex items-center justify-center text-white font-bold font-mono shadow-md print:bg-slate-800">
-                  <Heart className="h-7 w-7 text-white fill-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-extrabold text-slate-950">{company.companyName}</h1>
-                  <h2 className="text-xs font-semibold text-slate-500 font-sans tracking-wide uppercase">{company.companyNameEn}</h2>
-                </div>
-              </div>
-              <div className="text-xs text-slate-500 space-y-1 pr-1 pt-1">
-                <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" /> <span>{company.address}</span></div>
-                <div className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-slate-400" /> <span dir="ltr">{company.phone}</span></div>
-                {company.email && <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-slate-400" /> <span dir="ltr">{company.email}</span></div>}
-              </div>
+        <div className="invoice-card space-y-6" style={{ direction: 'rtl', textAlign: 'right' }}>
+          
+          {/* Company Header Block - Refined Header Layout */}
+          <div style={{ borderBottom: '3px solid #047857', paddingBottom: '12px', marginBottom: '24px' }} className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div className="space-y-1 text-right">
+              <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight" style={{ color: '#000000' }}>{company.companyName}</h1>
+              <h2 className="text-xs font-extrabold text-emerald-800 tracking-wide uppercase" style={{ color: '#047857' }}>High Care Home Medical Services - Egypt</h2>
             </div>
 
-            <div className="text-right sm:text-left space-y-2 shrink-0">
-              <div className="bg-teal-50/50 text-teal-800 font-bold text-xs py-1 px-3 rounded-full inline-block border border-teal-100/30 print:bg-slate-100 print:text-black">
-                فاتورة ضريبية مبسطة
-              </div>
-              <h3 className="text-2xl font-extrabold text-slate-900 font-mono tracking-tight">{invoice.id}</h3>
-              <div className="text-xs text-slate-500 space-y-1">
-                <div>تاريخ الإصدار: <span className="font-bold text-slate-800 font-mono">{invoice.date}</span></div>
-                <div>الرقم الضريبي للشركة: <span className="font-bold text-slate-800 font-mono">{company.vatNumber}</span></div>
-                <div>حالة الفاتورة: <span className={`font-bold ${invoice.status === 'new' ? 'text-emerald-600' : 'text-red-500'}`}>{invoice.status === 'new' ? 'جديدة' : 'ملغاة'}</span></div>
-              </div>
+            <div style={{ backgroundColor: '#f0fdf4', borderColor: '#047857', borderStyle: 'solid', borderWidth: '1px', padding: '8px 16px', borderRadius: '10px' }} className="text-center shrink-0 min-w-[170px]">
+              <div className="text-[10px] font-extrabold text-black uppercase tracking-wider" style={{ color: '#000000' }}>فاتورة خدمات طبية</div>
+              <h3 className="text-sm sm:text-base font-black text-black font-mono tracking-tight" dir="ltr" style={{ color: '#000000' }}>{invoice.id}</h3>
+              <div className="text-[11px] text-black font-bold" style={{ color: '#000000' }}>تاريخ الإصدار: <span className="font-bold text-black font-mono">{invoice.date}</span></div>
             </div>
           </div>
 
-          {/* Customer Details Block */}
-          <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 print:bg-slate-50 print:border">
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">بيانات العميل المستفيد</span>
-              <div className="text-sm font-extrabold text-slate-900">{invoice.customerName}</div>
-              <div className="text-xs text-slate-600">رقم الجوال: <span className="font-semibold font-mono" dir="ltr">{invoice.customerPhone}</span></div>
-              {invoice.customerAddress && <div className="text-xs text-slate-600">عنوان الزيارة الطبية: <span className="font-semibold">{invoice.customerAddress}</span></div>}
-            </div>
-
-            <div className="sm:border-r border-slate-200 sm:pr-6 space-y-1.5 text-right sm:text-left">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">جهة إصدار الفاتورة</span>
-              <div className="text-sm font-semibold text-slate-800">شركة هاي كير للخدمات الطبية المنزلية</div>
-              <div className="text-xs text-slate-600">الموظف المسؤول: <span className="font-semibold font-mono">{invoice.createdBy}</span></div>
-              <div className="text-xs text-slate-500">تم الحفظ تلقائياً في السجل الرقمي المعتمد للشركة</div>
-            </div>
+          {/* Structured Table: Customer & Invoice Info */}
+          <div className="mb-6 text-center" style={{ marginBottom: '28px' }}>
+            <table className="w-full text-center text-xs" style={{ borderCollapse: 'collapse', border: '1px solid #059669', width: '100%', direction: 'rtl' }}>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #059669' }}>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', width: '16%', textAlign: 'center', verticalAlign: 'middle' }}>اسم العميل:</td>
+                  <td style={{ padding: '8px 10px', fontWeight: 'bold', color: '#000000', border: '1px solid #059669', width: '34%', textAlign: 'center', verticalAlign: 'middle' }}>{invoice.customerName}</td>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', width: '16%', textAlign: 'center', verticalAlign: 'middle' }}>رقم الهاتف:</td>
+                  <td style={{ padding: '8px 10px', fontWeight: 'bold', color: '#000000', border: '1px solid #059669', width: '34%', textAlign: 'center', verticalAlign: 'middle', fontFamily: 'monospace' }} dir="ltr">{invoice.customerPhone}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #059669' }}>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>عنوان الزيارة:</td>
+                  <td style={{ padding: '8px 10px', color: '#000000', fontWeight: 'bold', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{invoice.customerAddress || 'غير محدد'}</td>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>حالة الفاتورة:</td>
+                  <td style={{ padding: '8px 10px', fontWeight: 'bold', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <span style={{ padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: invoice.status === 'new' ? '#d1fae5' : '#fee2e2', color: invoice.status === 'new' ? '#065f46' : '#991b1b', border: `1px solid ${invoice.status === 'new' ? '#059669' : '#fca5a5'}` }}>
+                      {invoice.status === 'new' ? 'جديدة' : 'ملغاة'}
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>جهة الإصدار:</td>
+                  <td style={{ padding: '8px 10px', color: '#000000', fontWeight: 'bold', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{company.companyName}</td>
+                  <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 10px', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>الموظف المسؤول:</td>
+                  <td style={{ padding: '8px 10px', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{invoice.createdBy}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {/* Invoice Items Table */}
-          <div className="space-y-2">
-            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">تفاصيل الخدمات الطبية المنزلية المقدمة</span>
-            <div className="border border-slate-100 rounded-xl overflow-hidden print:border">
-              <table className="w-full text-right border-collapse text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-100">
-                    <th className="py-3.5 px-4 w-1/12 text-center">#</th>
-                    <th className="py-3.5 px-4 w-6/12">اسم الخدمة المقدمة ووصفها</th>
-                    <th className="py-3.5 px-4 w-1/12 text-center">الكمية</th>
-                    <th className="py-3.5 px-4 w-2/12">سعر الوحدة</th>
-                    <th className="py-3.5 px-4 w-2/12 text-left font-mono">الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invoice.items.map((item, index) => (
-                    <tr key={index} className="hover:bg-slate-50/20 transition-colors">
-                      <td className="py-3 px-4 text-center text-slate-400 font-bold font-mono">{index + 1}</td>
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{item.serviceName}</div>
-                      </td>
-                      <td className="py-3 px-4 text-center text-slate-600 font-mono">{item.quantity}</td>
-                      <td className="py-3 px-4 text-slate-600 font-mono">{item.price.toLocaleString()} ريال</td>
-                      <td className="py-3 px-4 text-left font-bold text-slate-900 font-mono">{(item.price * item.quantity).toLocaleString()} ريال</td>
+          {/* Invoice Items Table - Clear Large Spacing & Centered Crisp Black Text */}
+          <div className="text-center" style={{ marginTop: '28px', marginBottom: '28px' }}>
+            <table className="w-full text-center text-xs" style={{ borderCollapse: 'collapse', border: '1px solid #059669', width: '100%', direction: 'rtl' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#047857', color: '#ffffff' }}>
+                  <th style={{ padding: '10px 8px', width: '6%', textAlign: 'center', verticalAlign: 'middle', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', color: '#ffffff' }}>م</th>
+                  <th style={{ padding: '10px 12px', width: '38%', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>اسم الخدمة المقدمة</th>
+                  <th style={{ padding: '10px 12px', width: '26%', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>تاريخ إجراء الخدمة</th>
+                  <th style={{ padding: '10px 8px', width: '8%', textAlign: 'center', verticalAlign: 'middle', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', color: '#ffffff' }}>الكمية</th>
+                  <th style={{ padding: '10px 12px', width: '11%', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>سعر الوحدة</th>
+                  <th style={{ padding: '10px 12px', width: '11%', textAlign: 'center', verticalAlign: 'middle', border: '1px solid #047857', fontWeight: '800', fontSize: '13px', fontFamily: 'monospace', color: '#ffffff' }}>الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.items.map((item, index) => {
+                  const formattedDate = (item.serviceDateType === 'range' || item.serviceEndDate) && item.serviceEndDate
+                    ? `من ${item.serviceDate || invoice.date} إلى ${item.serviceEndDate}`
+                    : (item.serviceDate || invoice.date);
+
+                  const bgColor = index % 2 === 0 ? '#ffffff' : '#f0fdf4';
+
+                  return (
+                    <tr key={index} style={{ backgroundColor: bgColor }}>
+                      <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'middle', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669' }}>{index + 1}</td>
+                      <td style={{ padding: '8px 12px', fontWeight: 'bold', color: '#000000', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{item.serviceName}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11px', color: '#000000', fontWeight: 'bold', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{formattedDate}</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'middle', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669' }}>{item.quantity}</td>
+                      <td style={{ padding: '8px 12px', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{item.price.toLocaleString()}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', color: '#000000', fontFamily: 'monospace', border: '1px solid #059669' }}>{(item.price * item.quantity).toLocaleString()}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Bottom Columns: Notes & Totals & QR Code */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 items-start">
+          {/* Bottom Columns: Notes & Totals Table - Generous Gap Above */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-2 items-start text-right" style={{ marginTop: '28px' }}>
             
             {/* Notes and Policies */}
-            <div className="md:col-span-7 space-y-4">
+            <div className="md:col-span-7 space-y-3 text-right">
               {invoice.notes && (
-                <div className="space-y-1">
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">ملاحظات الطبيب / الممرض</span>
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">{invoice.notes}</p>
+                <div style={{ border: '1px solid #059669', borderRadius: '6px', padding: '10px 12px', backgroundColor: '#f0fdf4' }} className="space-y-1">
+                  <span className="text-[11px] font-black text-black uppercase tracking-wider block" style={{ color: '#000000' }}>ملاحظات:</span>
+                  <p className="text-xs text-black leading-relaxed font-bold" style={{ color: '#000000' }}>{invoice.notes}</p>
                 </div>
               )}
               
-              <div className="space-y-1">
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">الشروط والسياسة المطبوعة</span>
-                <p className="text-[10px] text-slate-400 leading-normal font-sans">{company.invoicePolicy}</p>
+              <div style={{ border: '1px solid #059669', borderRadius: '6px', padding: '10px 12px', backgroundColor: '#ffffff' }} className="space-y-1">
+                <span className="text-[11px] font-black text-black uppercase tracking-wider block" style={{ color: '#000000' }}>الشروط والسياسة:</span>
+                <p className="text-[11px] text-black font-semibold leading-normal font-sans" style={{ color: '#000000' }}>{company.invoicePolicy}</p>
               </div>
             </div>
 
-            {/* Calculations Totals & QR Code Block */}
-            <div className="md:col-span-5 bg-slate-50 p-5 rounded-xl border border-slate-100 space-y-4 print:bg-white print:border">
-              <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex justify-between text-slate-500">
-                  <span>الإجمالي الفرعي الخاضع للضريبة:</span>
-                  <span className="font-semibold font-mono text-slate-800">{invoice.subtotal.toLocaleString()} ريال</span>
-                </div>
-                {invoice.discountAmount > 0 && (
-                  <div className="flex justify-between text-red-600 font-medium">
-                    <span>الخصم المطبق:</span>
-                    <span className="font-bold font-mono">-{invoice.discountAmount.toLocaleString()} ريال</span>
-                  </div>
-                )}
-                <div className="border-t border-slate-200 my-2 pt-2 flex justify-between items-center text-slate-950 font-bold">
-                  <span>الإجمالي النهائي المستحق:</span>
-                  <span className="text-base font-extrabold text-teal-700 font-mono print:text-black">
-                    {invoice.total.toLocaleString()} ريال
-                  </span>
-                </div>
-                <div className="flex justify-between text-[11px] text-slate-400 mt-1">
-                  <span>شامل ضريبة القيمة المضافة 15%:</span>
-                  <span className="font-semibold font-mono">{invoiceVat.toLocaleString()} ريال</span>
-                </div>
-              </div>
-
-              {/* Saudi ZATCA QR Code Scan Element */}
-              <div className="border-t border-slate-200/60 pt-4 flex flex-col items-center text-center space-y-1.5">
-                <div className="bg-white p-1.5 border border-slate-100 rounded-lg shadow-sm">
-                  {qrImageUrl ? (
-                    <img
-                      src={qrImageUrl}
-                      alt="ZATCA E-Invoicing QR Code"
-                      className="h-32 w-32 object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="h-32 w-32 bg-slate-100 flex items-center justify-center text-xs text-slate-400">جاري التوليد...</div>
+            {/* Structured Summary Totals Table */}
+            <div className="md:col-span-5 text-center">
+              <table className="w-full text-center text-xs" style={{ borderCollapse: 'collapse', border: '1px solid #059669', width: '100%', direction: 'rtl' }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #059669' }}>
+                    <td style={{ backgroundColor: '#ecfdf5', fontWeight: 'bold', color: '#000000', padding: '8px 12px', border: '1px solid #059669', width: '50%', textAlign: 'center', verticalAlign: 'middle' }}>الإجمالي الفرعي:</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontFamily: 'monospace', color: '#000000', border: '1px solid #059669' }}>{invoice.subtotal.toLocaleString()} ج.م</td>
+                  </tr>
+                  {invoice.discountAmount > 0 && (
+                    <tr style={{ borderBottom: '1px solid #fca5a5', color: '#dc2626' }}>
+                      <td style={{ backgroundColor: '#fef2f2', fontWeight: 'bold', padding: '8px 12px', border: '1px solid #fca5a5', textAlign: 'center', verticalAlign: 'middle' }}>الخصم المطبق:</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #fca5a5' }}>-{invoice.discountAmount.toLocaleString()} ج.م</td>
+                    </tr>
                   )}
-                </div>
-                <span className="text-[9px] font-extrabold text-slate-400 tracking-wide">رمز الفاتورة الإلكترونية المعتمد لـ ZATCA</span>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Bottom Signature Space */}
-          <div className="border-t border-slate-100 pt-8 flex justify-between text-xs text-slate-500 px-2">
-            <div className="space-y-1.5">
-              <div>أُصدرت بواسطة الموظف المعتمد:</div>
-              <div className="font-bold text-slate-800 font-sans">{invoice.createdBy}</div>
-              <div className="h-0.5 w-24 border-b border-dashed border-slate-300 pt-2" />
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <div>التوقيع والختم الرسمي للشركة:</div>
-              <div className="font-bold text-slate-800">Hi Care Medical Services</div>
-              <div className="h-0.5 w-24 border-b border-dashed border-slate-300 pt-2 mr-auto" />
+                  <tr style={{ backgroundColor: '#047857', color: '#ffffff', fontWeight: 'bold' }}>
+                    <td style={{ padding: '10px 12px', border: '1px solid #047857', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>الإجمالي النهائي المستحق:</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: '800', fontSize: '15px', fontFamily: 'monospace', color: '#ffffff', border: '1px solid #047857' }}>{invoice.total.toLocaleString()} ج.م</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

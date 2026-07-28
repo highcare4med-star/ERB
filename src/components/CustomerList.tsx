@@ -92,7 +92,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث بالاسم، الجوال أو العنوان..."
+            placeholder="ابحث بالاسم، الهاتف أو العنوان..."
             className="block w-full pr-9 pl-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
           />
         </div>
@@ -162,7 +162,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
                   <h2 className="text-xl font-bold text-slate-900">{selectedCustomerDetails.customer.name}</h2>
                   <p className="text-xs text-slate-400 flex items-center gap-1 font-mono">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>تاريخ التسجيل: {new Date(selectedCustomerDetails.customer.createdAt).toLocaleDateString('ar-SA')}</span>
+                    <span>تاريخ التسجيل: {new Date(selectedCustomerDetails.customer.createdAt).toLocaleDateString('ar-EG')}</span>
                   </p>
                 </div>
                 <div className="bg-teal-50/50 text-teal-600 h-10 w-10 rounded-xl flex items-center justify-center font-bold text-lg border border-teal-100/30">
@@ -173,7 +173,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600 border-t border-white/20 pt-4">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-slate-400" />
-                  <span className="font-semibold">رقم الجوال:</span>
+                  <span className="font-semibold">رقم الهاتف:</span>
                   <span className="font-mono">{selectedCustomerDetails.customer.phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
                   <h4 className="text-2xl font-black text-slate-900 font-mono">
                     {selectedCustomerDetails.stats.totalValue.toLocaleString()}
                   </h4>
-                  <span className="text-xs text-slate-500">ريال</span>
+                  <span className="text-xs text-slate-500">جنية مصري</span>
                 </div>
                 <div className="absolute bottom-2 left-2 text-teal-600/10">
                   <DollarSign className="h-10 w-10 stroke-2" />
@@ -213,7 +213,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
                   <h4 className="text-2xl font-black text-emerald-600 font-mono">
                     {selectedCustomerDetails.stats.totalDiscounts.toLocaleString()}
                   </h4>
-                  <span className="text-xs text-slate-500">ريال</span>
+                  <span className="text-xs text-slate-500">جنية مصري</span>
                 </div>
                 <div className="absolute bottom-2 left-2 text-emerald-600/10">
                   <Tag className="h-10 w-10 stroke-2" />
@@ -267,7 +267,7 @@ export default function CustomerList({ token, onSelectInvoice, userPermissions }
                           <td className="py-2.5 px-5 font-bold text-slate-900 font-mono">{inv.id}</td>
                           <td className="py-2.5 px-5 text-slate-500 font-mono">{inv.date}</td>
                           <td className="py-2.5 px-5 text-slate-500">{inv.createdBy}</td>
-                          <td className="py-2.5 px-5 font-bold text-slate-900 font-mono">{inv.total.toLocaleString()} ريال</td>
+                          <td className="py-2.5 px-5 font-bold text-slate-900 font-mono">{inv.total.toLocaleString()} جنية مصري</td>
                           <td className="py-2.5 px-5 text-center">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               inv.status === 'new'

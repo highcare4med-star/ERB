@@ -56,16 +56,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         className="sm:mx-auto sm:w-full sm:max-w-md"
       >
         <div className="flex justify-center">
-          <div className="h-16 w-16 rounded-2xl bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-100/50">
-            <Activity className="h-9 w-9 text-white animate-pulse" />
-          </div>
+          <img 
+            src="/logo.jpg" 
+            alt="High Care Logo" 
+            className="h-20 w-auto object-contain rounded-2xl bg-white p-1.5 shadow-lg shadow-teal-100/50 border border-slate-100"
+            referrerPolicy="no-referrer"
+          />
         </div>
         
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900 font-sans">
-          هاي كير للخدمات الطبية المنزلية
+          هاي كير للخدمات الطبية المنزلية بمصر
         </h2>
         <p className="mt-2 text-center text-sm text-slate-500">
-          Hi Care Home Medical Services
+          High Care Home Medical Services - Egypt
         </p>
         <p className="mt-1 text-center text-xs text-teal-700 bg-teal-50/50 backdrop-blur-sm rounded-full py-1 px-3 w-max mx-auto border border-teal-100/50 font-medium">
           نظام الفوترة الإلكترونية وإصدار الفواتير الذكي
@@ -155,23 +158,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               </button>
             </div>
           </form>
-
-          <div className="mt-8 border-t border-slate-200/50 pt-6">
-            <div className="flex items-start gap-2 bg-white/30 backdrop-blur-sm rounded-xl p-3 border border-white/40">
-              <ShieldAlert className="h-4.5 w-4.5 text-slate-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-slate-500 leading-normal">
-                <span className="font-semibold text-slate-700">بيانات الدخول التجريبية (للتقييم):</span>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
-                  <div>• مدير نظام: <code className="bg-white/60 px-1 rounded text-slate-800">admin</code></div>
-                  <div>كلمة السر: <code className="bg-white/60 px-1 rounded text-slate-800">admin123</code></div>
-                  <div>• محاسب مالي: <code className="bg-white/60 px-1 rounded text-slate-800">financial</code></div>
-                  <div>كلمة السر: <code className="bg-white/60 px-1 rounded text-slate-800">fin123</code></div>
-                  <div>• مدخل فواتير: <code className="bg-white/60 px-1 rounded text-slate-800">billing</code></div>
-                  <div>كلمة السر: <code className="bg-white/60 px-1 rounded text-slate-800">bill123</code></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </motion.div>
     </div>

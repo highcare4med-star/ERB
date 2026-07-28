@@ -184,7 +184,7 @@ export default function SettingsForm({ token }: SettingsFormProps) {
                 required
                 value={companyNameEn}
                 onChange={(e) => setCompanyNameEn(e.target.value)}
-                placeholder="Hi Care Home Medical Services"
+                placeholder="High Care Home Medical Services"
                 className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none"
               />
             </div>
@@ -201,7 +201,7 @@ export default function SettingsForm({ token }: SettingsFormProps) {
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+966500000000"
+                  placeholder="+201000000000"
                   className="block w-full pr-8 pl-3 py-2.5 glass-input rounded-xl text-sm font-mono focus:outline-none"
                 />
               </div>
@@ -218,15 +218,15 @@ export default function SettingsForm({ token }: SettingsFormProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="info@hicare.sa"
+                  placeholder="info@hicare.eg"
                   className="block w-full pr-8 pl-3 py-2.5 glass-input rounded-xl text-sm font-mono focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* VAT registration number (Saudi ZATCA compliance) */}
+            {/* VAT registration number */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">الرقم الضريبي للشركة (VAT - 15 خانة)</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">الرقم الضريبي / التسجيل التسجيلي للشركة (VAT)</label>
               <div className="relative">
                 <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <AlertCircle className="h-4 w-4 text-slate-400" />
@@ -234,14 +234,13 @@ export default function SettingsForm({ token }: SettingsFormProps) {
                 <input
                   type="text"
                   required
-                  maxLength={15}
                   value={vatNumber}
-                  onChange={(e) => setVatNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="310xxxxxxxxxxx3"
+                  onChange={(e) => setVatNumber(e.target.value)}
+                  placeholder="123456789"
                   className="block w-full pr-8 pl-3 py-2.5 glass-input rounded-xl text-sm font-mono text-right focus:outline-none"
                 />
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">الرقم الضريبي الموحد للمنشآت في المملكة العربية السعودية يبدأ وينتهي بالرقم 3.</p>
+              <p className="text-[10px] text-slate-400 mt-1">رقم التسجيل الضريبي لدى مصلحة الضرائب المصرية.</p>
             </div>
 
             {/* Address */}
@@ -256,7 +255,7 @@ export default function SettingsForm({ token }: SettingsFormProps) {
                   required
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="الرياض - طريق الملك فهد - المملكة العربية السعودية"
+                  placeholder="القاهرة - جمهورية مصر العربية"
                   className="block w-full pr-8 pl-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none"
                 />
               </div>

@@ -234,7 +234,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
                 type="text"
                 value={searchPhone}
                 onChange={(e) => setSearchPhone(e.target.value)}
-                placeholder="05xxxxxxx"
+                placeholder="01xxxxxxxxx"
                 className="block w-full pr-8 pl-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
               />
             </div>
@@ -309,7 +309,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
                   <th className="py-4 px-6">رقم الفاتورة</th>
                   <th className="py-4 px-6">التاريخ</th>
                   <th className="py-4 px-6">اسم العميل</th>
-                  <th className="py-4 px-6">رقم الجوال</th>
+                  <th className="py-4 px-6">رقم الهاتف</th>
                   <th className="py-4 px-6">الموظف المصدر</th>
                   <th className="py-4 px-6 font-mono">الإجمالي النهائي</th>
                   <th className="py-4 px-6 text-center">الحالة</th>
@@ -332,7 +332,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
                       <td className="py-3.5 px-6 text-slate-500 font-mono">{inv.customerPhone}</td>
                       <td className="py-3.5 px-6 text-slate-500">{inv.createdBy}</td>
                       <td className="py-3.5 px-6 font-extrabold text-slate-900 font-mono">
-                        {inv.total.toLocaleString()} ريال
+                        {inv.total.toLocaleString()} جنية مصري
                       </td>
                       <td className="py-3.5 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${

@@ -272,15 +272,16 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 const DEFAULT_SETTINGS: Settings = {
-  companyName: 'هاي كير للخدمات الطبية المنزلية',
-  companyNameEn: 'Hi Care Home Medical Services',
-  phone: '+966500000000',
-  email: 'info@hicare.sa',
-  address: 'الرياض، المملكة العربية السعودية - طريق الملك فهد',
-  vatNumber: '310123456789003',
-  invoicePolicy: 'الفاتورة صالحة لمدة 30 يوماً من تاريخ الإصدار. الأسعار تشمل ضريبة القيمة المضافة 15%. الخدمات الطبية المنزلية تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.',
-  primaryColor: '#0284c7', // Sky blue
+  companyName: 'هاي كير للخدمات الطبية المنزلية بمصر',
+  companyNameEn: 'High Care Home Medical Services - Egypt',
+  phone: '+201000000000',
+  email: 'info@hicare.eg',
+  address: 'القاهرة، جمهورية مصر العربية',
+  vatNumber: '123-456-789',
+  invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.',
+  primaryColor: '#0d9488', // Teal
   secondaryColor: '#0f172a', // Deep slate
+  logoUrl: '/logo.jpg'
 };
 
 export class JSONDatabase {
@@ -645,7 +646,7 @@ export class JSONDatabase {
     this.logActivity(
       executor,
       'إصدار فاتورة',
-      `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} ريال`,
+      `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} جنية مصري`,
       ip,
       ua
     );
@@ -901,7 +902,7 @@ export class JSONDatabase {
     const subtotalSum = activeInvoices.reduce((sum, i) => sum + i.subtotal, 0);
     const discountSum = activeInvoices.reduce((sum, i) => sum + i.discountAmount, 0);
     const totalRevenueSum = activeInvoices.reduce((sum, i) => sum + i.total, 0);
-    const totalTaxSum = activeInvoices.reduce((sum, i) => sum + (i.total - i.total / 1.15), 0); // Assuming 15% VAT is included in total
+    const totalTaxSum = activeInvoices.reduce((sum, i) => sum + (i.total - i.total / 1.14), 0); // Assuming 14% Egyptian VAT is included in total
 
     // Grouping by Date for visual charts
     const chartDataMap: Record<string, { date: string; revenue: number; count: number }> = {};
