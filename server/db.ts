@@ -557,11 +557,17 @@ export class SQLiteDatabase {
       }
     }
 
-    if (fileBuffer) {
-      this.db = new SQL.Database(fileBuffer);
-    } else {
-      this.db = new SQL.Database();
+  if (fileBuffer) {
+    try {
+        this.db = new SQL.Database(fileBuffer);
+    } catch (err) {
+        console.log("Database is corrupted. Creating a new one...");
+        fs.unlinkSync(DB_SQLITE_PATH);
+        this.db = new SQL.Database();
     }
+} else {
+    this.db = new SQL.Database();
+}
 
     this.initTablesAndMigrate();
     this.isReady = true;
