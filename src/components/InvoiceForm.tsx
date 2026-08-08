@@ -1,7 +1,225 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart, ChevronDown, Check, Minus, Stethoscope, Pill } from 'lucide-react';
 import { Invoice, InvoiceItem, Service, Customer } from '../types';
+
+interface ServicePickerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  services: Service[];
+  onSelectService: (service: Service) => void;
+  selectedServiceId?: string;
+}
+
+function ServicePickerModal({ isOpen, onClose, services, onSelectService, selectedServiceId }: ServicePickerModalProps) {
+  const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+      setSelectedCategory('الكل');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const filteredServices = services.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(query.toLowerCase()) || 
+                          (s.description || '').toLowerCase().includes(query.toLowerCase());
+    const matchesCat = selectedCategory === 'الكل' || (s.category || 'الخدمات الطبية') === selectedCategory;
+    return matchesSearch && matchesCat;
+  });
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 100 }}
+          className="bg-white w-full sm:max-w-2xl h-[90vh] sm:h-[80vh] rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden dir-rtl font-sans"
+        >
+          {/* Header */}
+          <div className="p-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
+            <div>
+              <h3 className="font-extrabold text-base flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-teal-400" />
+                <span>اختر الخدمة أو المستلزم الطبي</span>
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">انقر على أي عنصر لإضافته مباشرة للفاتورة</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="p-3 bg-slate-100 border-b border-slate-200 shrink-0 space-y-2">
+            <div className="relative">
+              <input
+                type="text"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث باسم الخدمة أو الدواء أو المستلزم..."
+                className="w-full py-2.5 pr-10 pl-9 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs"
+              />
+              <Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="absolute left-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Category Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+              {[
+                { id: 'الكل', label: 'الكل' },
+                { id: 'الخدمات الطبية', label: '🩺 الخدمات الطبية' },
+                { id: 'الأدوية والمستلزمات الطبية', label: '💊 الأدوية والمستلزمات' }
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    selectedCategory === cat.id
+                      ? 'bg-teal-700 text-white shadow-xs scale-102'
+                      : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* List Results */}
+          <div className="flex-1 overflow-y-auto p-3 divide-y divide-slate-100">
+            {filteredServices.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-semibold space-y-2">
+                <Search className="h-8 w-8 mx-auto text-slate-300" />
+                <p>لا توجد نتائج تطابق "{query}"</p>
+              </div>
+            ) : (
+              filteredServices.map(srv => {
+                const isSelected = selectedServiceId === srv.id;
+                const isSupply = srv.category === 'الأدوية والمستلزمات الطبية';
+                return (
+                  <div
+                    key={srv.id}
+                    onClick={() => {
+                      onSelectService(srv);
+                      onClose();
+                    }}
+                    className={`p-3 rounded-xl transition-all cursor-pointer flex items-center justify-between my-1 border ${
+                      isSelected
+                        ? 'bg-teal-50 border-teal-300 shadow-xs'
+                        : 'bg-white hover:bg-slate-50 border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0 pr-1">
+                      <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                        isSupply ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                      }`}>
+                        {isSupply ? <Pill className="h-5 w-5" /> : <Stethoscope className="h-5 w-5" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-slate-900 text-sm">{srv.name}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isSupply ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-teal-50 text-teal-800 border border-teal-200'
+                          }`}>
+                            {srv.category || 'الخدمات الطبية'}
+                          </span>
+                        </div>
+                        {srv.description && (
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-1">{srv.description}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 mr-2">
+                      <div className="text-left">
+                        <span className="font-mono font-extrabold text-teal-700 text-sm block">
+                          {srv.defaultPrice.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block font-semibold">جنية مصري</span>
+                      </div>
+                      <div className={`p-2 rounded-xl transition-colors ${
+                        isSelected ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-teal-600'
+                      }`}>
+                        {isSelected ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer bar */}
+          <div className="p-3 bg-slate-50 border-t border-slate-200 text-center text-xs text-slate-500 font-semibold shrink-0">
+            إجمالي العناصر المتاحة: <span className="font-mono font-bold text-slate-800">{filteredServices.length}</span>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
+
+interface ServiceComboboxProps {
+  services: Service[];
+  selectedServiceId: string;
+  selectedServiceName: string;
+  onSelect: (service: Service) => void;
+  onOpenModal: () => void;
+}
+
+function ServiceCombobox({ services, selectedServiceId, selectedServiceName, onSelect, onOpenModal }: ServiceComboboxProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(selectedServiceName || '');
+
+  useEffect(() => {
+    setQuery(selectedServiceName || '');
+  }, [selectedServiceName]);
+
+  return (
+    <div className="relative w-full">
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={query}
+          onClick={onOpenModal}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onOpenModal();
+          }}
+          placeholder="انقر لاختيار الخدمة أو الدواء..."
+          className="block w-full py-2 px-3 glass-input rounded-xl text-xs focus:outline-none font-bold text-slate-800 border border-slate-200/80 cursor-pointer"
+        />
+        <button
+          type="button"
+          onClick={onOpenModal}
+          className="p-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shrink-0 transition-colors cursor-pointer"
+          title="فتح قائمة البحث الشاملة"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface InvoiceFormProps {
   token: string;
@@ -33,6 +251,9 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Service Modal state for mobile/easy picking
+  const [activeModalItemIndex, setActiveModalItemIndex] = useState<number | null>(null);
 
   // Fetch Services & Customers
   useEffect(() => {
@@ -328,44 +549,221 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
           </div>
         </div>
 
-        {/* Invoice items table */}
+        {/* Service Picker Modal for easy touch selection */}
+        <ServicePickerModal
+          isOpen={activeModalItemIndex !== null}
+          onClose={() => setActiveModalItemIndex(null)}
+          services={services}
+          selectedServiceId={activeModalItemIndex !== null ? items[activeModalItemIndex]?.serviceId : undefined}
+          onSelectService={(srv) => {
+            if (activeModalItemIndex !== null) {
+              const updated = [...items];
+              updated[activeModalItemIndex] = {
+                ...updated[activeModalItemIndex],
+                serviceId: srv.id,
+                serviceName: srv.name,
+                price: srv.defaultPrice
+              };
+              setItems(updated);
+            }
+          }}
+        />
+
+        {/* Invoice items table / cards */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Calculator className="h-4.5 w-4.5 text-teal-600" />
-              <span>جدول الخدمات الطبية المنزلية المقدمة</span>
+              <span>جدول الخدمات الطبية والمستلزمات المقدمة</span>
             </h3>
+            <span className="text-xs text-slate-500 font-semibold">عدد البنود: <span className="font-mono font-bold text-teal-700">{items.length}</span></span>
           </div>
 
-          <div className="border border-white/20 rounded-xl overflow-hidden">
+          {/* MOBILE CARD VIEW (Visible on small screens) */}
+          <div className="block md:hidden space-y-4">
+            {items.map((item, idx) => {
+              const currentSrv = services.find(s => s.id === item.serviceId);
+              const isSupply = currentSrv?.category === 'الأدوية والمستلزمات الطبية';
+              return (
+                <div key={idx} className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+                  {/* Card Header */}
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <span className="text-xs font-extrabold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-100">
+                      بند رقم #{idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItemRow(idx)}
+                      disabled={items.length === 1}
+                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>حذف</span>
+                    </button>
+                  </div>
+
+                  {/* Service Picker Trigger */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">الخدمة / المستلزم الطبي</label>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalItemIndex(idx)}
+                      className="w-full text-right p-3 bg-slate-50 hover:bg-teal-50/60 border border-slate-200 rounded-xl transition-all cursor-pointer flex items-center justify-between gap-2"
+                    >
+                      {item.serviceName ? (
+                        <div className="min-w-0 pr-1">
+                          <div className="font-bold text-slate-900 text-xs truncate">{item.serviceName}</div>
+                          {currentSrv?.category && (
+                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold mt-0.5 ${
+                              isSupply ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                            }`}>
+                              {currentSrv.category}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-teal-700 flex items-center gap-1.5">
+                          <Plus className="h-4 w-4 text-teal-600" />
+                          <span>انقر لاختيار الخدمة أو المستلزم</span>
+                        </span>
+                      )}
+                      <Search className="h-4 w-4 text-teal-600 shrink-0" />
+                    </button>
+                  </div>
+
+                  {/* Date Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-slate-500">تاريخ الخدمة</label>
+                        <select
+                          value={item.serviceDateType || 'single'}
+                          onChange={(e) => handleItemValueChange(idx, 'serviceDateType', e.target.value)}
+                          className="text-[10px] py-0.5 px-1.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200"
+                        >
+                          <option value="single">تاريخ محدد</option>
+                          <option value="range">فترة (من - إلى)</option>
+                        </select>
+                      </div>
+                      
+                      {item.serviceDateType === 'range' ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="date"
+                            value={item.serviceDate || date}
+                            onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                            className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
+                          />
+                          <span className="text-xs text-slate-500 font-bold">إلى</span>
+                          <input
+                            type="date"
+                            value={item.serviceEndDate || ''}
+                            onChange={(e) => handleItemValueChange(idx, 'serviceEndDate', e.target.value)}
+                            className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          type="date"
+                          value={item.serviceDate || date}
+                          onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                          className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quantity & Price Grid */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Quantity Stepper */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">الكمية</label>
+                      <div className="flex items-center bg-slate-100 rounded-xl border border-slate-200 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleItemValueChange(idx, 'quantity', Math.max(1, item.quantity - 1))}
+                          className="p-2 text-slate-600 hover:text-slate-900 active:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={item.quantity}
+                          onChange={(e) => handleItemValueChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
+                          className="w-full text-center font-mono font-extrabold text-xs bg-transparent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleItemValueChange(idx, 'quantity', item.quantity + 1)}
+                          className="p-2 text-slate-600 hover:text-slate-900 active:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Price Input */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">السعر الفردي (ج.م)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={item.price}
+                        onChange={(e) => handleItemValueChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                        className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs w-full font-mono font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Subtotal Footer in Card */}
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-slate-500 font-bold">الإجمالي الفرعي للبند:</span>
+                    <span className="font-mono font-extrabold text-teal-700 text-sm">
+                      {(item.price * item.quantity).toLocaleString()} جنية مصري
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP TABLE VIEW (Visible on medium+ screens) */}
+          <div className="hidden md:block border border-white/20 rounded-xl overflow-hidden">
             <table className="w-full text-right border-collapse text-sm">
               <thead>
                 <tr className="bg-white/10 text-slate-700 text-xs font-bold border-b border-white/10">
-                  <th className="py-3 px-3 w-4/12">الخدمة الطبية</th>
-                  <th className="py-3 px-3 w-4/12">تاريخ إجراء الخدمة</th>
-                  <th className="py-3 px-3 w-1/12 text-center">الكمية</th>
+                  <th className="py-3 px-3 w-4/12">الخدمة / المستلزم الطبي</th>
+                  <th className="py-3 px-3 w-3/12">تاريخ إجراء الخدمة</th>
+                  <th className="py-3 px-3 w-1.5/12 text-center">الكمية</th>
                   <th className="py-3 px-3 w-1.5/12">السعر (جنية مصري)</th>
                   <th className="py-3 px-3 w-1.5/12 font-mono">الإجمالي الفرعي</th>
-                  <th className="py-3 px-3 w-1/12 text-center">إجراء</th>
+                  <th className="py-3 px-3 w-0.5/12 text-center">إجراء</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {items.map((item, idx) => (
                   <tr key={idx} className="hover:bg-white/10 transition-colors align-top">
                     <td className="py-3 px-3">
-                      <select
-                        required
-                        value={item.serviceId}
-                        onChange={(e) => handleItemServiceChange(idx, e.target.value)}
-                        className="block w-full py-1.5 px-3 glass-input rounded-lg text-xs focus:outline-none appearance-none"
-                      >
-                        <option value="" className="bg-slate-100 text-slate-800">-- اختر الخدمة من القائمة الافتراضية --</option>
-                        {services.map(srv => (
-                          <option key={srv.id} value={srv.id} className="bg-slate-100 text-slate-800">
-                            {srv.name} (السعر: {srv.defaultPrice} جنية مصري)
-                          </option>
-                        ))}
-                      </select>
+                      <ServiceCombobox
+                        services={services}
+                        selectedServiceId={item.serviceId}
+                        selectedServiceName={item.serviceName}
+                        onOpenModal={() => setActiveModalItemIndex(idx)}
+                        onSelect={(srv) => {
+                          const updated = [...items];
+                          updated[idx] = {
+                            ...updated[idx],
+                            serviceId: srv.id,
+                            serviceName: srv.name,
+                            price: srv.defaultPrice
+                          };
+                          setItems(updated);
+                        }}
+                      />
                     </td>
                     <td className="py-3 px-3">
                       <div className="space-y-1.5">
@@ -415,7 +813,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         required
                         value={item.quantity}
                         onChange={(e) => handleItemValueChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                        className="block w-full py-1 px-2 glass-input rounded-lg text-center text-xs focus:outline-none"
+                        className="block w-full py-1.5 px-2 glass-input rounded-lg text-center text-xs font-extrabold focus:outline-none"
                       />
                     </td>
                     <td className="py-3 px-3">
@@ -426,18 +824,18 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         required
                         value={item.price}
                         onChange={(e) => handleItemValueChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                        className="block w-full py-1 px-2 glass-input rounded-lg text-xs focus:outline-none"
+                        className="block w-full py-1.5 px-2 glass-input rounded-lg text-xs font-extrabold focus:outline-none"
                       />
                     </td>
                     <td className="py-3 px-3 font-bold text-slate-800 font-mono text-xs pt-4">
-                      {(item.price * item.quantity).toLocaleString()} جنية مصري
+                      {(item.price * item.quantity).toLocaleString()} ج.م
                     </td>
                     <td className="py-3 px-3 text-center pt-3.5">
                       <button
                         type="button"
                         onClick={() => handleRemoveItemRow(idx)}
                         disabled={items.length === 1}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-30 transition-all cursor-pointer"
+                        className="text-red-500 hover:text-red-700 disabled:opacity-30 transition-all cursor-pointer p-1"
                         title="حذف سطر الخدمة"
                       >
                         <Trash2 className="h-4.5 w-4.5" />
@@ -449,15 +847,15 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             </table>
           </div>
 
-          {/* Add service button positioned directly below the table */}
+          {/* Add service button positioned directly below */}
           <div className="flex justify-start pt-1">
             <button
               type="button"
               onClick={handleAddItemRow}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-50 hover:bg-teal-100/90 border border-teal-200/80 text-teal-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-sm active:scale-98 min-h-[44px]"
             >
-              <Plus className="h-4 w-4 text-teal-600" />
-              <span>إضافة خدمة جديدة للفاتورة</span>
+              <Plus className="h-4.5 w-4.5 text-white" />
+              <span>إضافة خدمة أو مستلزم جديد للفاتورة</span>
             </button>
           </div>
         </div>

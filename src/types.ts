@@ -29,6 +29,7 @@ export interface Service {
   name: string;
   defaultPrice: number;
   description: string;
+  category?: string;
   isActive: boolean;
 }
 

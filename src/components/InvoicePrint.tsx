@@ -475,9 +475,9 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
                 </div>
               )}
               
-              <div style={{ border: '1px solid #059669', borderRadius: '6px', padding: '10px 12px', backgroundColor: '#ffffff' }} className="space-y-1">
-                <span className="text-[11px] font-black text-black uppercase tracking-wider block" style={{ color: '#000000' }}>الشروط والسياسة:</span>
-                <p className="text-[11px] text-black font-semibold leading-normal font-sans" style={{ color: '#000000' }}>{company.invoicePolicy}</p>
+              <div style={{ border: '1px solid #059669', borderRadius: '6px', padding: '6px 10px', backgroundColor: '#ffffff' }} className="space-y-0.5">
+                <span className="text-[9px] font-bold text-black uppercase tracking-wider block" style={{ color: '#000000', fontSize: '9px' }}>الشروط والسياسة:</span>
+                <p className="text-[9px] text-black font-medium leading-tight font-sans" style={{ color: '#000000', fontSize: '9px' }}>{company.invoicePolicy}</p>
               </div>
             </div>
 

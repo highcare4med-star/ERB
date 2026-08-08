@@ -13,6 +13,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
 
   // Form State for Adding / Editing Service
   const [showForm, setShowForm] = useState(false);
@@ -21,6 +22,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
   const [formName, setFormName] = useState('');
   const [formPrice, setFormPrice] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [formCategory, setFormCategory] = useState('الخدمات الطبية');
   const [formIsActive, setFormIsActive] = useState(true);
   
   const [formLoading, setFormLoading] = useState(false);
@@ -56,6 +58,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
     setFormName('');
     setFormPrice('');
     setFormDescription('');
+    setFormCategory('الخدمات الطبية');
     setFormIsActive(true);
     setFormError('');
     setShowForm(true);
@@ -66,6 +69,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
     setFormName(srv.name);
     setFormPrice(String(srv.defaultPrice));
     setFormDescription(srv.description);
+    setFormCategory(srv.category || 'الخدمات الطبية');
     setFormIsActive(srv.isActive);
     setFormError('');
     setShowForm(true);
@@ -106,6 +110,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
           name: formName.trim(),
           defaultPrice: priceNum,
           description: formDescription.trim(),
+          category: formCategory,
           isActive: formIsActive
         })
       });
@@ -147,10 +152,17 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
     }
   };
 
-  const filteredServices = services.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredServices = services.filter(s => {
+    const matchesSearch = 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = 
+      selectedCategory === 'الكل' || 
+      (s.category || 'الخدمات الطبية') === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="space-y-6 font-sans text-slate-800" dir="rtl">
@@ -195,7 +207,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Service Name */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-500 mb-1">اسم الخدمة الطبية بالكامل</label>
@@ -207,6 +219,19 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
                   placeholder="مثال: رعاية تمريضية منزلية - نوبة 12 ساعة"
                   className="block w-full px-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
                 />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">تصنيف الخدمة</label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  className="block w-full px-3 py-2 glass-input rounded-xl text-sm focus:outline-none font-bold text-slate-800"
+                >
+                  <option value="الخدمات الطبية">الخدمات الطبية</option>
+                  <option value="الأدوية والمستلزمات الطبية">الأدوية والمستلزمات الطبية</option>
+                </select>
               </div>
 
               {/* Default Price */}
@@ -278,20 +303,42 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
       )}
 
       {/* Services Directory Filters */}
-      <div className="glass-card p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center gap-4 justify-between">
-        <div className="relative w-full sm:max-w-md">
-          <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-400" />
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="البحث باسم الخدمة أو الشرح الوصفي..."
-            className="block w-full pr-9 pl-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
-          />
+      <div className="glass-card p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-center gap-4 justify-between">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* Search Box */}
+          <div className="relative w-full sm:w-72">
+            <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="البحث باسم الخدمة..."
+              className="block w-full pr-9 pl-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
+            />
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+            {['الكل', 'الخدمات الطبية', 'الأدوية والمستلزمات الطبية'].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-white text-teal-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-xs text-slate-500 font-semibold">عدد الخدمات المطابقة: {filteredServices.length} خدمات</p>
+
+        <p className="text-xs text-slate-500 font-semibold self-end md:self-auto">عدد العناصر المطابقة: <span className="font-mono font-bold text-teal-700">{filteredServices.length}</span></p>
       </div>
 
       {/* services table */}
@@ -321,15 +368,24 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
                 }`}
               >
                 <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      srv.isActive 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                        : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {srv.isActive ? 'نشطة ومتاحة' : 'غير نشطة حالياً'}
-                    </span>
-                    <HeartHandshake className="h-5 w-5 text-teal-500 shrink-0" />
+                  <div className="flex justify-between items-start mb-3 gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        srv.isActive 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                          : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {srv.isActive ? 'نشطة' : 'غير نشطة'}
+                      </span>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        srv.category === 'الأدوية والمستلزمات الطبية'
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : 'bg-teal-50 text-teal-800 border border-teal-200'
+                      }`}>
+                        {srv.category || 'الخدمات الطبية'}
+                      </span>
+                    </div>
+                    <HeartHandshake className="h-4 w-4 text-teal-500 shrink-0" />
                   </div>
 
                   <h3 className="font-bold text-slate-900 text-sm mb-1">{srv.name}</h3>

@@ -263,7 +263,7 @@ app.get('/api/services', requireAuth, (req, res) => {
 });
 
 app.post('/api/services', requireAuth, requirePermission('manage_services'), (req: any, res) => {
-  const { name, defaultPrice, description, isActive } = req.body;
+  const { name, defaultPrice, description, category, isActive } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   if (!name || defaultPrice === undefined) {
@@ -280,6 +280,7 @@ app.post('/api/services', requireAuth, requirePermission('manage_services'), (re
     name,
     defaultPrice: priceNum,
     description: description || '',
+    category: category || 'الخدمات الطبية',
     isActive: isActive !== undefined ? isActive : true
   };
 
@@ -289,7 +290,7 @@ app.post('/api/services', requireAuth, requirePermission('manage_services'), (re
 
 app.put('/api/services/:id', requireAuth, requirePermission('manage_services'), (req: any, res) => {
   const { id } = req.params;
-  const { name, defaultPrice, description, isActive } = req.body;
+  const { name, defaultPrice, description, category, isActive } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   const service = db.getServiceById(id);
@@ -307,6 +308,7 @@ app.put('/api/services/:id', requireAuth, requirePermission('manage_services'), 
     name: name || service.name,
     defaultPrice: priceNum,
     description: description !== undefined ? description : service.description,
+    category: category !== undefined ? category : (service.category || 'الخدمات الطبية'),
     isActive: isActive !== undefined ? isActive : service.isActive
   };
 
@@ -738,7 +740,10 @@ async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

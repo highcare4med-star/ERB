@@ -35,6 +35,7 @@ export interface Service {
   name: string;
   defaultPrice: number;
   description: string;
+  category?: string;
   isActive: boolean;
 }
 
@@ -224,307 +225,127 @@ const DEFAULT_USERS: User[] = [
 ];
 
 const DEFAULT_SERVICES: Service[] = [
-  {
-    id: 'srv-1',
-    name: 'زيارة طبيب منزلية للكشف العام',
-    defaultPrice: 300,
-    description: 'زيارة طبيب عام للمنزل للكشف السريري وتشخيص الحالة وتحديد الخطة العلاجية',
-    isActive: true
-  },
-  {
-    id: 'srv-2',
-    name: 'جلسة علاج طبيعي منزلي (60 دقيقة)',
-    defaultPrice: 200,
-    description: 'جلسة إعادة تأهيل وعلاج طبيعي منزلي بواسطة أخصائيين مؤهلين',
-    isActive: true
-  },
-  {
-    id: 'srv-3',
-    name: 'رعاية تمريضية منزلية - نوبة 12 ساعة',
-    defaultPrice: 500,
-    description: 'مرافقة تمريضية منزلية متكاملة تشمل قياس العلامات الحيوية وإعطاء الأدوية',
-    isActive: true
-  },
-  {
-    id: 'srv-4',
-    name: 'رعاية تمريضية منزلية - نوبة 24 ساعة',
-    defaultPrice: 900,
-    description: 'رعاية تمريضية على مدار الساعة لخدمة الحالات الحرجة ومتابعة المرضى',
-    isActive: true
-  },
-  {
-    id: 'srv-5',
-    name: 'رعاية كبار السن المنزلية اليومية',
-    defaultPrice: 400,
-    description: 'تقديم العناية الشخصية اليومية والمساعدة المعيشية والنفسية للمسنين في منازلهم',
-    isActive: true
-  },
-  {
-    id: 'srv-6',
-    name: 'تغيير على الجروح المعقدة والحروق',
-    defaultPrice: 250,
-    description: 'تنظيف وتغيير معقم للجروح والحروق باستخدام أحدث المواد المعقمة',
-    isActive: true
-  },
-  {
-    id: 'srv-7',
-    name: 'تركيب وتغيير القسطرة البولية بالمنزل',
-    defaultPrice: 150,
-    description: 'خدمة التمريض المنزلي لتركيب أو العناية بالقسطرة البولية بصورة معقمة',
-    isActive: true
-  },
-  {
-    id: 'srv-8',
-    name: 'سحب العينات التحليلية المنزلية',
-    defaultPrice: 100,
-    description: 'سحب الدم والعينات المخبرية وتوصيلها للمختبر المعتمد مع إرسال النتائج',
-    isActive: true
-  },
-  {
-    id: 'srv-9',
-    name: 'علاج صنيدارون (Sunnydarone)',
-    defaultPrice: 35,
-    description: 'دواء صنيدارون للمريض',
-    isActive: true
-  },
-  {
-    id: 'srv-10',
-    name: 'جلوكوز 25%',
-    defaultPrice: 60,
-    description: 'محلول جلوكوز تركيز 25%',
-    isActive: true
-  },
-  {
-    id: 'srv-11',
-    name: 'محلول بوتاسيوم (Potassium)',
-    defaultPrice: 30,
-    description: 'أمبول / محلول بوتاسيوم وريدي',
-    isActive: true
-  },
-  {
-    id: 'srv-12',
-    name: 'أمبول ماغنسيوم',
-    defaultPrice: 40,
-    description: 'محلول / أمبول ماغنسيوم وريدي',
-    isActive: true
-  },
-  {
-    id: 'srv-13',
-    name: 'جلوكوز 10%',
-    defaultPrice: 50,
-    description: 'محلول جلوكوز تركيز 10%',
-    isActive: true
-  },
-  {
-    id: 'srv-14',
-    name: 'زيارة طبيب استشاري منزلي',
-    defaultPrice: 2000,
-    description: 'زيارة طبيب استشاري للمنزل للمتابعة والكشف الدقيق',
-    isActive: true
-  },
-  {
-    id: 'srv-15',
-    name: 'طبيب مقيم 24 ساعة',
-    defaultPrice: 4500,
-    description: 'مرافقة طبيب مقيم بالمنزل لمتابعة الحالة على مدار 24 ساعة',
-    isActive: true
-  },
-  {
-    id: 'srv-16',
-    name: 'إيجار جهاز تنفس صناعي منزلي',
-    defaultPrice: 4000,
-    description: 'إيجار وتوفير جهاز تنفس صناعي للرعاية المنزلية',
-    isActive: true
-  },
-  {
-    id: 'srv-17',
-    name: 'تحليل غازات الدم (ABG)',
-    defaultPrice: 700,
-    description: 'سحب وعمل تحليل غازات بالدم الشرياني',
-    isActive: true
-  },
-  {
-    id: 'srv-18',
-    name: 'ملء اسطوانة أكسجين',
-    defaultPrice: 400,
-    description: 'إعادة تعبئة وملء اسطوانة الأكسجين الطبي',
-    isActive: true
-  },
-  {
-    id: 'srv-19',
-    name: 'نقل اسطوانة أكسجين',
-    defaultPrice: 450,
-    description: 'خدمة نقل وتوصيل اسطوانات الأكسجين للمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-20',
-    name: 'إيجار اسطوانة أكسجين',
-    defaultPrice: 800,
-    description: 'إيجار اسطوانة أكسجين بالمنزل مع المنظم',
-    isActive: true
-  },
-  {
-    id: 'srv-21',
-    name: 'إيجار سيرنج بمب (مضخة محاليل)',
-    defaultPrice: 1500,
-    description: 'إيجار مضخة المحاليل والأدوية الوريدية الإلكترونية',
-    isActive: true
-  },
-  {
-    id: 'srv-22',
-    name: 'إيجار سرير طبي منزلي',
-    defaultPrice: 5000,
-    description: 'إيجار سرير طبي كهربائي / يدوي للرعاية المنزلية',
-    isActive: true
-  },
-  {
-    id: 'srv-23',
-    name: 'توصيل سرير طبي',
-    defaultPrice: 500,
-    description: 'نقل وتوصيل السرير الطبي لموقع العميل',
-    isActive: true
-  },
-  {
-    id: 'srv-24',
-    name: 'نقل ومشال سرير طبي للأدوار العليا',
-    defaultPrice: 600,
-    description: 'خدمة رفع ونقل السرير الطبي للأدوار العليا',
-    isActive: true
-  },
-  {
-    id: 'srv-25',
-    name: 'رسم قلب منزلي (ECG)',
-    defaultPrice: 450,
-    description: 'عمل فحص رسم قلب كهربائي للمريض بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-26',
-    name: 'أشعة عادية على الصدر منزلي (Chest X-Ray)',
-    defaultPrice: 800,
-    description: 'تصوير أشعة سينية على الصدر بجهاز متنقل بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-27',
-    name: 'أشعة دوبلر طرف واحد',
-    defaultPrice: 2100,
-    description: 'فحص الأشعة التلفزيونية الدوبلر للأوعية الدموية بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-28',
-    name: 'تحاليل طبية منزلية عامة',
-    defaultPrice: 650,
-    description: 'مجموعة تحاليل طبية وشاملة من المنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-29',
-    name: 'تمريض منزلي 24 ساعة',
-    defaultPrice: 2000,
-    description: 'خدمة التمريض المنزلي اليومية الكاملة 24 ساعة',
-    isActive: true
-  },
-  {
-    id: 'srv-30',
-    name: 'زيارة طبيب عناية مركزة',
-    defaultPrice: 1800,
-    description: 'زيارة منزلية بواسطة أخصائي عناية مركزة للحالات الحرجة',
-    isActive: true
-  },
-  {
-    id: 'srv-31',
-    name: 'إيجار جهاز مونيتور علامات حيوية',
-    defaultPrice: 1500,
-    description: 'إيجار شاشة مراقبة نبض وضغط وأكسجين المريض بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-32',
-    name: 'توصيل وضبط أجهزة طبية',
-    defaultPrice: 120,
-    description: 'توصيل وتشغيل الأجهزة الطبية المنزلية ومعايرتها',
-    isActive: true
-  },
-  {
-    id: 'srv-33',
-    name: 'إيجار جهاز شفاط مخاط (سكشن)',
-    defaultPrice: 850,
-    description: 'إيجار جهاز شفط الإفرازات والمخاط للرعاية المنزلية',
-    isActive: true
-  },
-  {
-    id: 'srv-34',
-    name: 'تركيب قسطرة وريد مركزي (CVP)',
-    defaultPrice: 3500,
-    description: 'إجراء تركيب قسطرة الوريد المركزي بواسطة استشاري متخصص',
-    isActive: true
-  },
-  {
-    id: 'srv-35',
-    name: 'تركيب أنبوبة شق حنجري',
-    defaultPrice: 2500,
-    description: 'تركيب وتغيير أنبوبة الشق الحنجري للمريض بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-36',
-    name: 'زيارة استشاري مخ وأعصاب',
-    defaultPrice: 2200,
-    description: 'كشف واستشارة منزلية بواسطة استشاري أمراض المخ والأعصاب',
-    isActive: true
-  },
-  {
-    id: 'srv-37',
-    name: 'حقن هيبارين',
-    defaultPrice: 85,
-    description: 'إعطاء حقن الهيبارين مضاد التجلط بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-38',
-    name: 'فحص موجات صوتية على القلب (إيكو منزلي)',
-    defaultPrice: 1500,
-    description: 'فحص الإيكو للقلب بجهاز الموجات الصوتية المتنقل',
-    isActive: true
-  },
-  {
-    id: 'srv-39',
-    name: 'فحص سونار منزلي (Pectel)',
-    defaultPrice: 2000,
-    description: 'فحص أشعة السونار والتلفزيونية على البطن والحوض بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-40',
-    name: 'وصلات ومستلزمات جهاز تنفس صناعي',
-    defaultPrice: 2000,
-    description: 'توفير وصلات وفلاتر ومستلزمات جهاز التنفس المعقمة',
-    isActive: true
-  },
-  {
-    id: 'srv-41',
-    name: 'إجراء بذل بواسطة طبيب استشاري',
-    defaultPrice: 16000,
-    description: 'عملية سحب وبذل السوائل بالمنزل تحت إشراف أستاذ استشاري',
-    isActive: true
-  },
-  {
-    id: 'srv-42',
-    name: 'تركيب قسطرة بذل (Pigtail)',
-    defaultPrice: 2000,
-    description: 'تركيب قسطرة بيجتيل لسحب السوائل بالمنزل',
-    isActive: true
-  },
-  {
-    id: 'srv-43',
-    name: 'توصيل سيرنج بمب',
-    defaultPrice: 120,
-    description: 'خدمة توصيل وتشغيل جهاز سيرنج بمب',
-    isActive: true
-  }
+  // --- الخدمات الطبية ---
+  { id: 'srv-1', name: 'تمريض منزلي لمده 24ساعه', defaultPrice: 2000, description: 'رعاية تمريضية منزلية متكاملة على مدار 24 ساعة', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-2', name: 'ايجار اسطوانه اكسجين', defaultPrice: 800, description: 'إيجار اسطوانة أكسجين منزلية مع المنظم', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-3', name: 'ملو اسطوانه اكسجين', defaultPrice: 400, description: 'تعبئة وملو اسطوانة أكسجين طبي', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-4', name: 'نقل اسطوانه اكسجين', defaultPrice: 450, description: 'خدمة نقل وتوصيل اسطوانة أكسجين للمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-5', name: 'زياره طبيب عنايه', defaultPrice: 1800, description: 'كشف واستشارة طبيب عناية مركزة منزلية للحالات الحرجة', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-6', name: 'ايجار مونتور', defaultPrice: 1500, description: 'إيجار جهاز مونيتور لمتابعة العلامات الحيوية', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-7', name: 'ايجار سيرنج بامب', defaultPrice: 1500, description: 'إيجار مضخة المحاليل والأدوية الوريدية (سيرنج بامب)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-8', name: 'توصيل سيرنج بامب', defaultPrice: 120, description: 'خدمة نقل وتوصيل وتجهيز جهاز السيرنج بامب', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-9', name: 'توصيل اجهزه', defaultPrice: 120, description: 'خدمة توصيل ونقل وتشغيل الأجهزة الطبية المنزلية', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-10', name: 'طبيب مقيم لمده 24 ساعه', defaultPrice: 4500, description: 'مرافقة طبيب مقيم بالمنزل لمتابعة الحالة على مدار 24 ساعة', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-11', name: 'ايجار جهاز تنفس صناعي', defaultPrice: 4000, description: 'إيجار وتوفير جهاز التنفس الصناعي المنزلي', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-12', name: 'ايجار جهاز سكشن', defaultPrice: 850, description: 'إيجار جهاز شفط الإفرازات والمخاط (شفاط سكشن)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-13', name: 'تركيب قسطره cvp', defaultPrice: 3500, description: 'تركيب قسطرة الوريد المركزي CVP بواسطة استشاري متخصص', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-14', name: 'تركيب انبوبه قصبه هوائيه', defaultPrice: 2500, description: 'تركيب أو العناية بأنبوبة القصبة الهوائية بالمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-15', name: 'زياره استشاري مخ واعصاب', defaultPrice: 2200, description: 'زيارة منزلية لاستشاري أمراض المخ والأعصاب', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-16', name: 'ايجار سرير طبي اوتوماتك', defaultPrice: 5000, description: 'إيجار سرير طبي كهربائي أوتوماتيك للرعاية المنزلية', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-17', name: 'نقل ومشال سرير طبي للدور 16', defaultPrice: 600, description: 'خدمات رفع ونقل السرير الطبي للأدوار العليا', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-18', name: 'توصيل سرير', defaultPrice: 500, description: 'شحن وتوصيل السرير الطبي لموقع العميل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-19', name: 'زياره دكتور مصطفي', defaultPrice: 2000, description: 'زيارة واستشارة منزلية خاصة بواسطة طبيب استشاري', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-20', name: 'عمل بذل بواسطة طبيب استشاري', defaultPrice: 16000, description: 'إجراء عملية بذل استسقاء/سائل بالمنزل بواسطة استشاري', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-21', name: 'تحاليل', defaultPrice: 700, description: 'سحب وإجراء التحاليل الطبية الشاملة بالمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-22', name: 'Abg', defaultPrice: 700, description: 'تحليل غازات بالدم الشرياني (Arterial Blood Gas)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-23', name: 'ايكو', defaultPrice: 1500, description: 'فحص إيكو الموجات الصوتية للقلب بالمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-24', name: 'فحص سونار', defaultPrice: 2000, description: 'فحص ألتراساوند سونار على البطن والحوض بالمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-25', name: 'رسم قلب', defaultPrice: 450, description: 'تخطيط رسم قلب كهربائي منزلي (ECG)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-26', name: 'Chest xray', defaultPrice: 800, description: 'أشعة سينية على الصدر بجهاز متنقل بالمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-27', name: 'وصالت جهاز تنفس صناعي', defaultPrice: 2000, description: 'وصلات وفلاتر ومستلزمات تشغيل جهاز التنفس الصناعي', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-28', name: 'Pigtail', defaultPrice: 2000, description: 'تركيب ومستلزمات قسطرة بكتيل (Pigtail Drain)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-29', name: 'دوبلر طرف واحد', defaultPrice: 2100, description: 'فحص الأشعة التلفزيونية الدوبلر للأوعية الدموية طرف واحد', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-30', name: 'مرتبه هوائيه', defaultPrice: 1800, description: 'مرتبة هوائية طبية بالمنفاخ للوقاية من قرح الفراش', category: 'الخدمات الطبية', isActive: true },
+
+  // --- الأدوية والمستلزمات الطبية ---
+  { id: 'sup-1', name: 'درسنج كبير', defaultPrice: 20, description: 'ضماد/درسنج جراحي معقم حجم كبير', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-2', name: 'ماسك', defaultPrice: 75, description: 'ماسك طبي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-3', name: 'ممر هوائي', defaultPrice: 40, description: 'ممر هوائي فموي معقم (Airway)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-4', name: 'قسطره شفط', defaultPrice: 25, description: 'قسطرة شفط إفرازات معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-5', name: 'رباط شاش', defaultPrice: 15, description: 'رباط شاش جراحي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-6', name: 'Hydrocortisone', defaultPrice: 30, description: 'أمبولات هيدروكورتيزون مضاد للالتهاب', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-7', name: 'ماء مذيب', defaultPrice: 5, description: 'أمبولات ماء مقطر معقم للحل والأذابة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-8', name: 'ملح %3', defaultPrice: 130, description: 'محلول كلوريد صوديوم مركز 3%', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-9', name: 'Vfeend', defaultPrice: 1600, description: 'دواء فيفيند (Vfend) مضاد للفطريات', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-10', name: 'درينكم 15جم', defaultPrice: 150, description: 'مستحضر درينكم 15 جم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-11', name: 'البومين', defaultPrice: 1600, description: 'محلول البومين بشري معقم (Albumin)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-12', name: 'ليدز مونتور', defaultPrice: 7, description: 'وصلات ليدز مونيتور قياس رسم القلب', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-13', name: 'قسطره cvp', defaultPrice: 1000, description: 'مستلزمات قسطرة الوريد المركزي CVP المعقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-14', name: 'خيط %3', defaultPrice: 75, description: 'خيط خياطة جراحية معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-15', name: 'اله جراحيه', defaultPrice: 200, description: 'آلة أدوات جراحية معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-16', name: 'كحول', defaultPrice: 100, description: 'عبوة كحول طبي معقم للتطوير', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-17', name: 'كيس بول', defaultPrice: 25, description: 'كيس جمع بول معقم بمدراج', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-18', name: 'شرايط يوويل', defaultPrice: 410, description: 'شرائط قياس تحليلي Uwell', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-19', name: 'لازكس', defaultPrice: 12, description: 'أمبولات لازكس مدرة للبول (Lasix)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-20', name: 'Lidocaine', defaultPrice: 150, description: 'مخدر ليدوكايين موضعى', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-21', name: 'مسطره cvp', defaultPrice: 90, description: 'مسطرة قياس ضغط الوريد المركزي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-22', name: 'Avil', defaultPrice: 20, description: 'أمبولات أفيل مضادة للحساسية', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-23', name: 'كالسيوم', defaultPrice: 45, description: 'أمبولات كالسيوم معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-24', name: 'بوتاسيوم', defaultPrice: 40, description: 'أمبولات كلوريد البوتاسيوم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-25', name: 'ديكسا', defaultPrice: 15, description: 'أمبولات ديكساميثازون (Dexa)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-26', name: 'بيكاربونات', defaultPrice: 40, description: 'أمبولات صوديوم بيكربونات', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-27', name: 'رينجر', defaultPrice: 30, description: 'محلول رينجر وريدي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-28', name: 'تافينك', defaultPrice: 311, description: 'عقار تافينك مضاد حيوي (Tavanic)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-29', name: 'اتروفين', defaultPrice: 12, description: 'أمبولات اتروبين (Atropine)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-30', name: 'بالمكورت', defaultPrice: 40, description: 'جرعات بالمكورت لجلسات الاستنشاق (Pulmicort)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-31', name: 'لاتكس', defaultPrice: 300, description: 'قفازات طبية لاتكس فحص معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-32', name: 'ملح', defaultPrice: 30, description: 'محلول ملح طعام وريدي (Saline 0.9%)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-33', name: 'تارجوسيد', defaultPrice: 536, description: 'حقن تارجوسيد مضاد حيوي (Targocid)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-34', name: 'ماسك اكسجين', defaultPrice: 50, description: 'قناع ماسك أكسجين مع أنبوبة توصيل', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-35', name: 'ماسك ريسفوار', defaultPrice: 75, description: 'ماسك أكسجين مزود بخزان ريسفوار', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-36', name: 'دايل فلو', defaultPrice: 65, description: 'منظم وسيط محاليل دايل فلو (Dial-a-flow)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-37', name: 'انبوبه شفط', defaultPrice: 25, description: 'أنبوبة شفط معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-38', name: 'قسطره سيلكون', defaultPrice: 160, description: 'قسطرة بولية سيليكون معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-39', name: 'سرنجه انسولين', defaultPrice: 5, description: 'سرنجات أنسولين معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-40', name: 'هيبارين', defaultPrice: 85, description: 'أمبولات هيبارين مضاد للتجلط', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-41', name: 'شراب فوق الركبه', defaultPrice: 800, description: 'شراب طبي ضاغط لمنع التجلط فوق الركبة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-42', name: 'بيتادين', defaultPrice: 65, description: 'محلول مطهر بيتادين معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-43', name: 'شاش معقم', defaultPrice: 25, description: 'باكيت شاش جراحي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-44', name: 'درسنج معقم', defaultPrice: 20, description: 'ضماد درسنج معقم جراحي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-45', name: 'سرنجه 50سم', defaultPrice: 20, description: 'سرنجة كبيرة سعة 50 سم3', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-46', name: 'جيركن جل ازرق', defaultPrice: 150, description: 'جل سونار أزرق طبي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-47', name: 'ميرونام', defaultPrice: 553, description: 'حقن ميرونام مضاد حيوي واسع المجال (Meronem)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-48', name: 'كونترلوك', defaultPrice: 148, description: 'حقن كونترلوك لحماية المعدة (Controloc)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-49', name: 'كلكسان', defaultPrice: 311, description: 'حقن كلكسان مضاد للتجلط (Clexane)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-50', name: 'نور ادرينالين', defaultPrice: 75, description: 'أمبولات نور أدرينالين (Noradrenaline)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-51', name: 'فيتانيل', defaultPrice: 550, description: 'أمبولات فينتانيل مسكن قوي (Fentanyl)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-52', name: 'جلكوز %5', defaultPrice: 30, description: 'محلول جلوكوز تركيز 5%', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-53', name: 'صوديوم بيكارب', defaultPrice: 80, description: 'محلول صوديوم بيكربونات وريدي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-54', name: 'كيدمين', defaultPrice: 250, description: 'محلول كيدمين تغذية وريدية (Kidmin)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-55', name: 'ميدثتك', defaultPrice: 350, description: 'أمبولات ميدثتك مهدئ', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-56', name: 'سن سبينال اسود', defaultPrice: 100, description: 'سن إبرة بنج نصفي أسود (Spinal Needle)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-57', name: 'وصله حرف T', defaultPrice: 80, description: 'وصلة ثلاثية اتجاهات حرف T', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-58', name: 'جاون معقم', defaultPrice: 35, description: 'رداء جاون طبي معقم استعمال مرة واحدة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-59', name: 'جوانتي معقم', defaultPrice: 35, description: 'قفازات جراحية معقمة فردية', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-60', name: 'سالوسيت', defaultPrice: 65, description: 'محلول سالوسيت غسيل معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-61', name: 'قطن', defaultPrice: 75, description: 'باكيت قطن طبي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-62', name: 'مفارش سرير', defaultPrice: 450, description: 'مفارش سرير معقمة ضد السوائل', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-63', name: 'سرنجات', defaultPrice: 10, description: 'سرنجات معقمة قياسية', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-64', name: 'وصله وريديه', defaultPrice: 45, description: 'وصلة إطالة وريدية معقمة', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-65', name: 'يورينال', defaultPrice: 25, description: 'وعاء يورينال بلاستيك طبي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-66', name: 'سرنجه تومي', defaultPrice: 25, description: 'سرنجة تومي خاصة بالغسيل والتغذية', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-67', name: 'دايبر', defaultPrice: 700, description: 'حفاضات دايبر كبار السن عالية الامتصاص', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-68', name: 'جهاز محلول', defaultPrice: 20, description: 'جهاز نقل محاليل معقم بفلتر', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-69', name: 'ثري واي', defaultPrice: 30, description: 'محبس ثلاثي وصلة وريدية (3-Way Stopcock)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-70', name: 'تيجاديرم', defaultPrice: 65, description: 'لاصق شفاف معقم تثبيت القساطر (Tegaderm)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-71', name: 'وصلة دوديه', defaultPrice: 130, description: 'وصلة حلزونية دودية للمحاليل', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-72', name: 'وصله حرف Y', defaultPrice: 140, description: 'وصلة إطالة وريدية مزدوجة حرف Y', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-73', name: 'اوفر شوز', defaultPrice: 100, description: 'غطاء حذاء معقم أفر شوز', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-74', name: 'مشرط', defaultPrice: 10, description: 'شفرة مشرط جراحي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-75', name: 'شاش', defaultPrice: 15, description: 'شاش جراحي عادي', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-76', name: 'Sunnydarone', defaultPrice: 35, description: 'دواء صنيدارون', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-77', name: 'جلكوز %25', defaultPrice: 60, description: 'محلول جلوكوز 25%', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-78', name: 'ماغنسيوم', defaultPrice: 40, description: 'أمبولات سولفات ماغنسيوم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-79', name: 'جلكوز %10', defaultPrice: 50, description: 'محلول جلوكوز 10%', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-80', name: 'ماسك نيزل', defaultPrice: 75, description: 'قناع ماسك نيزل أنفي (Nasal Mask)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-81', name: 'جل ky', defaultPrice: 25, description: 'جل كاي واي طبي ملين معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-82', name: 'بلاستر', defaultPrice: 100, description: 'بكرة بلاستر طبي معقم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-83', name: 'Atrovent', defaultPrice: 305, description: 'بخاخ/محلول اتروفينت موسع للشعب (Atrovent)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-84', name: 'Ensure', defaultPrice: 550, description: 'مكمل غذائي أنشور معقم (Ensure)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-85', name: 'Pulmcort', defaultPrice: 800, description: 'مستحضر بالمكورت استنشاق (Pulmicort Package)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-86', name: 'Duphlac', defaultPrice: 170, description: 'شراب دوفلاك ملين (Duphalac)', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-87', name: 'Acetylcistaine', defaultPrice: 90, description: 'فوار أستيل سيلستين مذيب للبلغم', category: 'الأدوية والمستلزمات الطبية', isActive: true },
+  { id: 'sup-88', name: 'Medrelaximidine', defaultPrice: 365, description: 'مستحضر ميدريلاكسيميدين باسط للعضلات', category: 'الأدوية والمستلزمات الطبية', isActive: true }
 ];
 
 const DEFAULT_SETTINGS: Settings = {
@@ -557,19 +378,25 @@ export class SQLiteDatabase {
       }
     }
 
-  if (fileBuffer) {
-    try {
+    if (fileBuffer) {
+      try {
         this.db = new SQL.Database(fileBuffer);
-    } catch (err) {
-        console.log("Database is corrupted. Creating a new one...");
-        fs.unlinkSync(DB_SQLITE_PATH);
+        this.initTablesAndMigrate();
+      } catch (e) {
+        console.error('Database file is corrupt or malformed. Re-initializing new database:', e);
+        try {
+          if (fs.existsSync(DB_SQLITE_PATH)) {
+            fs.renameSync(DB_SQLITE_PATH, DB_SQLITE_PATH + '.bak.' + Date.now());
+          }
+        } catch (_) {}
         this.db = new SQL.Database();
+        this.initTablesAndMigrate();
+      }
+    } else {
+      this.db = new SQL.Database();
+      this.initTablesAndMigrate();
     }
-} else {
-    this.db = new SQL.Database();
-}
 
-    this.initTablesAndMigrate();
     this.isReady = true;
   }
 
@@ -687,6 +514,7 @@ export class SQLiteDatabase {
         name TEXT NOT NULL,
         default_price REAL NOT NULL,
         description TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT 'الخدمات الطبية',
         is_active INTEGER NOT NULL DEFAULT 1
       );
 
@@ -748,6 +576,13 @@ export class SQLiteDatabase {
         expires_at TEXT NOT NULL
       );
     `);
+
+    // Safe column migration for services table
+    try {
+      this.db.exec("ALTER TABLE services ADD COLUMN category TEXT NOT NULL DEFAULT 'الخدمات الطبية';");
+    } catch (e) {
+      // Column category already exists
+    }
 
     // Check if database needs data from legacy db.json or default seed
     const userCount = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users')?.count || 0;
@@ -875,6 +710,24 @@ export class SQLiteDatabase {
     } else {
       this.save();
     }
+
+    // Ensure all default services and medical supplies exist without overwriting custom database items
+    this.transaction(() => {
+      DEFAULT_SERVICES.forEach(s => {
+        const existing = this.queryOne<{ id: string }>('SELECT id FROM services WHERE id = ? OR LOWER(name) = ?', [s.id, s.name.toLowerCase()]);
+        if (!existing) {
+          this.run(
+            'INSERT INTO services (id, name, default_price, description, category, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+            [s.id, s.name, s.defaultPrice, s.description || '', s.category || 'الخدمات الطبية', s.isActive ? 1 : 0]
+          );
+        } else {
+          this.run(
+            'UPDATE services SET category = ? WHERE (id = ? OR LOWER(name) = ?) AND (category IS NULL OR category = "" OR category = "الخدمات الطبية")',
+            [s.category || 'الخدمات الطبية', s.id, s.name.toLowerCase()]
+          );
+        }
+      });
+    });
 
     // Ensure ismael admin user exists and is configured as active admin
     const ismaelUser = this.getUserByUsername('ismael');
@@ -1102,12 +955,13 @@ export class SQLiteDatabase {
 
   // --- Services Operations ---
   public getServices(): Service[] {
-    const rows = this.queryAll('SELECT * FROM services');
+    const rows = this.queryAll('SELECT * FROM services ORDER BY category ASC, name ASC');
     return rows.map(s => ({
       id: s.id,
       name: s.name,
       defaultPrice: Number(s.default_price),
       description: s.description || '',
+      category: s.category || 'الخدمات الطبية',
       isActive: Boolean(s.is_active)
     }));
   }
@@ -1120,6 +974,7 @@ export class SQLiteDatabase {
       name: s.name,
       defaultPrice: Number(s.default_price),
       description: s.description || '',
+      category: s.category || 'الخدمات الطبية',
       isActive: Boolean(s.is_active)
     };
   }
@@ -1127,8 +982,8 @@ export class SQLiteDatabase {
   public saveService(service: Service, executor: string, ip: string, ua: string): Service {
     const existing = this.getServiceById(service.id);
     this.run(
-      'INSERT OR REPLACE INTO services (id, name, default_price, description, is_active) VALUES (?, ?, ?, ?, ?)',
-      [service.id, service.name, service.defaultPrice, service.description || '', service.isActive ? 1 : 0]
+      'INSERT OR REPLACE INTO services (id, name, default_price, description, category, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+      [service.id, service.name, service.defaultPrice, service.description || '', service.category || 'الخدمات الطبية', service.isActive ? 1 : 0]
     );
     this.save();
 
