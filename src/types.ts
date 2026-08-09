@@ -17,6 +17,7 @@ export interface Role {
 
 export interface Customer {
   id: string;
+  code?: string;
   name: string;
   phone: string;
   address: string;

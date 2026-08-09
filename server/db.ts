@@ -23,6 +23,7 @@ export interface Role {
 
 export interface Customer {
   id: string;
+  code?: string;
   name: string;
   phone: string;
   address: string;
@@ -349,13 +350,13 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 const DEFAULT_SETTINGS: Settings = {
-  companyName: 'هاي كير للخدمات الطبية المنزلية بمصر',
-  companyNameEn: 'High Care Home Medical Services - Egypt',
+  companyName: 'هاي كير للخدمات الطبية',
+  companyNameEn: 'High Care Medical Services',
   phone: '+201000000000',
   email: 'info@hicare.eg',
   address: 'القاهرة، جمهورية مصر العربية',
   vatNumber: '123-456-789',
-  invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.',
+  invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية.',
   primaryColor: '#0d9488', // Teal
   secondaryColor: '#0f172a', // Deep slate
   logoUrl: '/logo.jpg'
@@ -582,6 +583,45 @@ export class SQLiteDatabase {
       this.db.exec("ALTER TABLE services ADD COLUMN category TEXT NOT NULL DEFAULT 'الخدمات الطبية';");
     } catch (e) {
       // Column category already exists
+    }
+
+    // Safe column migration for customers table
+    try {
+      this.db.exec("ALTER TABLE customers ADD COLUMN code TEXT;");
+    } catch (e) {
+      // Column code already exists
+    }
+
+    // Update company settings name if legacy
+    try {
+      this.db.exec("UPDATE settings SET company_name = 'هاي كير للخدمات الطبية', company_name_en = 'High Care Medical Services', invoice_policy = 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية.' WHERE id = 1 AND company_name LIKE '%المنزلية%';");
+    } catch (e) {
+      // Ignore
+    }
+
+    // Ensure all existing customers have a unique code like C101, C102...
+    try {
+      const customersWithoutCode = this.queryAll<{ id: string }>('SELECT id FROM customers WHERE code IS NULL OR code = "" ORDER BY created_at ASC');
+      if (customersWithoutCode.length > 0) {
+        let maxNum = 100;
+        const existingCodes = this.queryAll<{ code: string }>('SELECT code FROM customers WHERE code IS NOT NULL AND code != ""');
+        existingCodes.forEach(c => {
+          const match = c.code?.match(/\d+/);
+          if (match) {
+            const num = parseInt(match[0], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        });
+
+        customersWithoutCode.forEach(c => {
+          maxNum++;
+          const newCode = `C${maxNum}`;
+          this.run('UPDATE customers SET code = ? WHERE id = ?', [newCode, c.id]);
+        });
+        this.save();
+      }
+    } catch (e) {
+      // Ignore
     }
 
     // Check if database needs data from legacy db.json or default seed
@@ -870,10 +910,26 @@ export class SQLiteDatabase {
   }
 
   // --- Customers Operations ---
+  public generateNextCustomerCode(): string {
+    const existingCodes = this.queryAll<{ code?: string }>('SELECT code FROM customers WHERE code IS NOT NULL AND code != ""');
+    let maxNum = 100;
+    existingCodes.forEach(c => {
+      if (c.code) {
+        const match = c.code.match(/\d+/);
+        if (match) {
+          const num = parseInt(match[0], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    });
+    return `C${maxNum + 1}`;
+  }
+
   public getCustomers(): Customer[] {
     const rows = this.queryAll('SELECT * FROM customers ORDER BY created_at DESC');
     return rows.map(c => ({
       id: c.id,
+      code: c.code || 'C100',
       name: c.name,
       phone: c.phone,
       address: c.address || '',
@@ -887,6 +943,7 @@ export class SQLiteDatabase {
     if (!c) return undefined;
     return {
       id: c.id,
+      code: c.code || 'C100',
       name: c.name,
       phone: c.phone,
       address: c.address || '',
@@ -901,6 +958,7 @@ export class SQLiteDatabase {
     if (!c) return undefined;
     return {
       id: c.id,
+      code: c.code || 'C100',
       name: c.name,
       phone: c.phone,
       address: c.address || '',
@@ -911,17 +969,21 @@ export class SQLiteDatabase {
 
   public saveCustomer(customer: Customer, executor: string, ip: string, ua: string): Customer {
     const existing = this.getCustomerById(customer.id);
+    const code = customer.code || existing?.code || this.generateNextCustomerCode();
+
     this.run(
-      'INSERT OR REPLACE INTO customers (id, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [customer.id, customer.name, customer.phone.trim(), customer.address || '', customer.notes || '', customer.createdAt]
+      'INSERT OR REPLACE INTO customers (id, code, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [customer.id, code, customer.name, customer.phone.trim(), customer.address || '', customer.notes || '', customer.createdAt]
     );
     this.save();
+
+    const saved = { ...customer, code };
 
     if (existing) {
       this.logActivity(
         executor,
         'تعديل عميل',
-        `تعديل بيانات العميل ${customer.name} (${customer.phone})`,
+        `تعديل بيانات العميل ${saved.name} (كود: ${code} - هاتف: ${saved.phone})`,
         ip,
         ua
       );
@@ -929,12 +991,12 @@ export class SQLiteDatabase {
       this.logActivity(
         executor,
         'إنشاء عميل',
-        `إضافة عميل جديد ${customer.name} (${customer.phone})`,
+        `إضافة عميل جديد ${saved.name} (كود: ${code} - هاتف: ${saved.phone})`,
         ip,
         ua
       );
     }
-    return customer;
+    return saved;
   }
 
   public deleteCustomer(id: string, executor: string, ip: string, ua: string): boolean {
@@ -1102,41 +1164,50 @@ export class SQLiteDatabase {
     };
   }
 
-  // Generates automatic invoice ID like HC-YYYYMM-0001
-  private generateInvoiceId(dateStr: string): string {
+  // Generates automatic invoice ID using Customer Code like HC-YYYYMM-C101-01
+  private generateInvoiceId(dateStr: string, customerCode: string): string {
     const date = new Date(dateStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const prefix = `HC-${year}${month}-`;
+    const prefix = `HC-${year}${month}-${customerCode}-`;
 
-    const monthInvoices = this.queryAll<{ id: string }>('SELECT id FROM invoices WHERE id LIKE ?', [`${prefix}%`]);
+    const customerInvoices = this.queryAll<{ id: string }>('SELECT id FROM invoices WHERE id LIKE ? OR id LIKE ?', [
+      `${prefix}%`,
+      `%-${customerCode}-%`
+    ]);
+
     let maxNum = 0;
-    monthInvoices.forEach(i => {
+    customerInvoices.forEach(i => {
       const parts = i.id.split('-');
-      const numPart = parts[2];
-      if (numPart) {
-        const num = parseInt(numPart, 10);
-        if (num > maxNum) maxNum = num;
+      const lastNumStr = parts[parts.length - 1];
+      if (lastNumStr) {
+        const num = parseInt(lastNumStr, 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
       }
     });
 
     const nextNum = maxNum + 1;
-    const paddedNum = String(nextNum).padStart(4, '0');
+    const paddedNum = String(nextNum).padStart(2, '0');
     return `${prefix}${paddedNum}`;
   }
 
   public createInvoice(invoiceData: Omit<Invoice, 'id' | 'createdAt'>, executor: string, ip: string, ua: string): Invoice {
     return this.transaction(() => {
-      const invoiceId = this.generateInvoiceId(invoiceData.date);
-
       // Resolve Customer (auto-create or link)
       let customerId = invoiceData.customerId;
       const cleanPhone = invoiceData.customerPhone.trim();
+      let customerCode = 'C101';
 
-      const existingCustomer = this.getCustomerByPhone(cleanPhone);
+      let existingCustomer = this.getCustomerByPhone(cleanPhone);
+      if (!existingCustomer && customerId) {
+        existingCustomer = this.getCustomerById(customerId);
+      }
+
       if (!existingCustomer && invoiceData.customerName) {
+        const newCode = this.generateNextCustomerCode();
         const newCustomer: Customer = {
           id: `cust-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+          code: newCode,
           name: invoiceData.customerName,
           phone: cleanPhone,
           address: invoiceData.customerAddress || '',
@@ -1144,23 +1215,30 @@ export class SQLiteDatabase {
           createdAt: new Date().toISOString()
         };
         this.run(
-          'INSERT INTO customers (id, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [newCustomer.id, newCustomer.name, newCustomer.phone, newCustomer.address, newCustomer.notes, newCustomer.createdAt]
+          'INSERT INTO customers (id, code, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [newCustomer.id, newCustomer.code, newCustomer.name, newCustomer.phone, newCustomer.address, newCustomer.notes, newCustomer.createdAt]
         );
         customerId = newCustomer.id;
+        customerCode = newCustomer.code;
         this.logActivity(
           executor,
           'إنشاء عميل تلقائي',
-          `تم إنشاء حساب عميل تلقائي ${newCustomer.name} (${newCustomer.phone}) مع الفاتورة ${invoiceId}`,
+          `تم إنشاء حساب عميل تلقائي ${newCustomer.name} (كود: ${customerCode})`,
           ip,
           ua
         );
       } else if (existingCustomer) {
         customerId = existingCustomer.id;
+        customerCode = existingCustomer.code || this.generateNextCustomerCode();
+        if (!existingCustomer.code) {
+          this.run('UPDATE customers SET code = ? WHERE id = ?', [customerCode, existingCustomer.id]);
+        }
         if (!existingCustomer.address && invoiceData.customerAddress) {
           this.run('UPDATE customers SET address = ? WHERE id = ?', [invoiceData.customerAddress, existingCustomer.id]);
         }
       }
+
+      const invoiceId = this.generateInvoiceId(invoiceData.date, customerCode);
 
       const createdAt = new Date().toISOString();
       const newInvoice: Invoice = {

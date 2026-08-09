@@ -39,9 +39,38 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
     window.print();
   };
 
+  const getCleanFileName = () => {
+    const cName = (invoice?.customerName || 'عميل').trim().replace(/[/\\?%*:|"<>]/g, '_');
+    const code = (invoice?.id || 'HC').trim();
+    return `فاتورة_${cName}_${code}.pdf`;
+  };
+
+  const getServiceNameStyle = (name: string) => {
+    const len = (name || '').trim().length;
+    let fontSize = '12px';
+    let lineHeight = '1.35';
+    if (len > 60) {
+      fontSize = '9px';
+      lineHeight = '1.2';
+    } else if (len > 35) {
+      fontSize = '10px';
+      lineHeight = '1.25';
+    } else if (len > 20) {
+      fontSize = '11px';
+      lineHeight = '1.3';
+    }
+    return {
+      fontSize,
+      lineHeight,
+      wordBreak: 'break-word' as const,
+      overflowWrap: 'break-word' as const,
+      whiteSpace: 'normal' as const
+    };
+  };
+
   const getPdfOptions = () => ({
     margin: 6,
-    filename: `فاتورة_هاي_كير_${invoice?.id || 'HC'}.pdf`,
+    filename: getCleanFileName(),
     image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: {
       scale: 2,
@@ -206,7 +235,7 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
       const pdfWorker = html2pdfModule().set(opt).from(element);
       const pdfBlob: Blob = await pdfWorker.output('blob');
 
-      const fileName = `فاتورة_هاي_كير_${invoice.id}.pdf`;
+      const fileName = getCleanFileName();
       const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
       // Try Web Share API with File payload (Supported on Mobile browsers like iOS Safari / Chrome Android)
@@ -259,13 +288,13 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
   }
 
   const company = settings || {
-    companyName: 'هاي كير للخدمات الطبية المنزلية بمصر',
-    companyNameEn: 'High Care Home Medical Services - Egypt',
+    companyName: 'هاي كير للخدمات الطبية',
+    companyNameEn: 'High Care Medical Services',
     phone: '+201000000000',
     email: 'info@hicare.eg',
     address: 'القاهرة، جمهورية مصر العربية',
     vatNumber: '123-456-789',
-    invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية المنزلية.',
+    invoicePolicy: 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية.',
     logoUrl: '/logo.jpg'
   };
 
@@ -387,7 +416,7 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
           <div style={{ borderBottom: '3px solid #047857', paddingBottom: '12px', marginBottom: '24px' }} className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="space-y-1 text-right">
               <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight" style={{ color: '#000000' }}>{company.companyName}</h1>
-              <h2 className="text-xs font-extrabold text-emerald-800 tracking-wide uppercase" style={{ color: '#047857' }}>High Care Home Medical Services - Egypt</h2>
+              <h2 className="text-xs font-extrabold text-emerald-800 tracking-wide uppercase" style={{ color: '#047857' }}>High Care Medical Services</h2>
             </div>
 
             <div style={{ backgroundColor: '#f0fdf4', borderColor: '#047857', borderStyle: 'solid', borderWidth: '1px', padding: '8px 16px', borderRadius: '10px' }} className="text-center shrink-0 min-w-[170px]">
@@ -451,7 +480,7 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
                   return (
                     <tr key={index} style={{ backgroundColor: bgColor }}>
                       <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'middle', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669' }}>{index + 1}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 'bold', color: '#000000', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{item.serviceName}</td>
+                      <td style={{ padding: '6px 8px', fontWeight: 'bold', color: '#000000', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle', ...getServiceNameStyle(item.serviceName) }}>{item.serviceName}</td>
                       <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11px', color: '#000000', fontWeight: 'bold', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{formattedDate}</td>
                       <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'middle', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669' }}>{item.quantity}</td>
                       <td style={{ padding: '8px 12px', color: '#000000', fontWeight: 'bold', fontFamily: 'monospace', border: '1px solid #059669', textAlign: 'center', verticalAlign: 'middle' }}>{item.price.toLocaleString()}</td>

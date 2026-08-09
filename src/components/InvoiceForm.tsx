@@ -186,6 +186,121 @@ interface ServiceComboboxProps {
   onOpenModal: () => void;
 }
 
+interface CustomerPickerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  customers: Customer[];
+  onSelectCustomer: (customer: Customer) => void;
+}
+
+function CustomerPickerModal({ isOpen, onClose, customers, onSelectCustomer }: CustomerPickerModalProps) {
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const filtered = customers.filter(c => {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(q) ||
+      (c.code || '').toLowerCase().includes(q) ||
+      (c.address || '').toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 100 }}
+          className="bg-white w-full sm:max-w-xl h-[85vh] sm:h-[75vh] rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden dir-rtl font-sans"
+        >
+          {/* Header */}
+          <div className="p-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
+            <div>
+              <h3 className="font-extrabold text-base flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-teal-400" />
+                <span>قائمة العملاء والمرضى المسجلين</span>
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">اختر العميل بالاسم أو رقم الهاتف أو كود العميل لتعبئة البيانات آلياً</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Search Box */}
+          <div className="p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+            <div className="relative">
+              <Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث بالاسم، رقم الهاتف، أو كود العميل (مثال C101)..."
+                className="w-full pr-9 pl-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-teal-500"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Customers List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {filtered.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <p className="text-sm">لا يوجد عملاء مطابقين للبحث</p>
+              </div>
+            ) : (
+              filtered.map((cust) => (
+                <div
+                  key={cust.id}
+                  onClick={() => {
+                    onSelectCustomer(cust);
+                    onClose();
+                  }}
+                  className="p-3 bg-white hover:bg-teal-50/70 border border-slate-200 hover:border-teal-400 rounded-xl cursor-pointer transition-all flex items-center justify-between group shadow-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-teal-100 text-teal-800 text-[11px] font-extrabold px-2 py-0.5 rounded-full font-mono">
+                        {cust.code || 'C100'}
+                      </span>
+                      <span className="font-bold text-slate-900 text-sm">{cust.name}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                      <span className="font-mono font-semibold" dir="ltr">{cust.phone}</span>
+                      {cust.address && <span>• {cust.address}</span>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 bg-teal-600 group-hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                  >
+                    اختيار
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
+
 function ServiceCombobox({ services, selectedServiceId, selectedServiceName, onSelect, onOpenModal }: ServiceComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState(selectedServiceName || '');
@@ -254,6 +369,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
   
   // Service Modal state for mobile/easy picking
   const [activeModalItemIndex, setActiveModalItemIndex] = useState<number | null>(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   // Fetch Services & Customers
   useEffect(() => {
@@ -300,15 +416,35 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
     }
   }, [editingInvoice]);
 
+  // Handle customer name change and autocomplete
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCustomerName(value);
+
+    if (value.trim().length >= 1) {
+      const filtered = customers.filter(c =>
+        c.name.toLowerCase().includes(value.toLowerCase()) ||
+        c.phone.includes(value) ||
+        (c.code || '').toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+      setShowCustomerDropdown(true);
+    } else {
+      setFilteredCustomers([]);
+      setShowCustomerDropdown(false);
+    }
+  };
+
   // Handle phone change and filter customers for autocomplete
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setCustomerPhone(value);
-    
-    if (value.trim().length >= 3) {
-      const filtered = customers.filter(c => 
-        c.phone.includes(value) || 
-        c.name.toLowerCase().includes(value.toLowerCase())
+
+    if (value.trim().length >= 1) {
+      const filtered = customers.filter(c =>
+        c.phone.includes(value) ||
+        c.name.toLowerCase().includes(value.toLowerCase()) ||
+        (c.code || '').toLowerCase().includes(value.toLowerCase())
       );
       setFilteredCustomers(filtered);
       setShowCustomerDropdown(true);
@@ -477,75 +613,99 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
         )}
 
         {/* Client & Metadata block */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Customer Phone (Autocomplete Trigger) */}
-          <div className="relative">
-            <label className="block text-xs font-bold text-slate-500 mb-1">رقم الهاتف (البحث أو الإدخال)</label>
-            <input
-              type="text"
-              required
-              value={customerPhone}
-              onChange={handlePhoneChange}
-              onFocus={() => customerPhone.trim().length >= 3 && setShowCustomerDropdown(true)}
-              onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-              placeholder="مثال: 01000000000"
-              className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
-            />
-            {/* Autocomplete Dropdown */}
-            {showCustomerDropdown && filteredCustomers.length > 0 && (
-              <div className="absolute z-20 w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-50 text-slate-800">
-                {filteredCustomers.map(cust => (
-                  <div
-                    key={cust.id}
-                    onMouseDown={() => handleSelectCustomer(cust)}
-                    className="p-3 text-right hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs transition-colors"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-800">{cust.name}</div>
-                      <div className="text-slate-400 mt-0.5">{cust.phone}</div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-teal-600" />
+              <h3 className="font-bold text-sm text-slate-800">بيانات العميل / المريض</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCustomerModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            >
+              <Search className="h-3.5 w-3.5 text-teal-600" />
+              <span>اختر من العملاء المسجلين ({customers.length})</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Customer Name */}
+            <div className="relative">
+              <label className="block text-xs font-bold text-slate-500 mb-1">اسم العميل بالكامل</label>
+              <input
+                type="text"
+                required
+                value={customerName}
+                onChange={handleNameChange}
+                onFocus={() => customerName.trim().length >= 1 && setShowCustomerDropdown(true)}
+                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                placeholder="اسم المريض أو العميل"
+                className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
+              />
+              {/* Autocomplete Dropdown */}
+              {showCustomerDropdown && filteredCustomers.length > 0 && (
+                <div className="absolute z-30 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100 text-slate-800 dir-rtl">
+                  {filteredCustomers.map(cust => (
+                    <div
+                      key={cust.id}
+                      onMouseDown={() => handleSelectCustomer(cust)}
+                      className="p-2.5 text-right hover:bg-teal-50 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-teal-100 text-teal-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded font-mono">
+                            {cust.code || 'C100'}
+                          </span>
+                          <span className="font-bold text-slate-900">{cust.name}</span>
+                        </div>
+                        <div className="text-slate-400 mt-0.5 font-mono" dir="ltr">{cust.phone}</div>
+                      </div>
+                      <UserCheck className="h-4 w-4 text-teal-500 shrink-0" />
                     </div>
-                    <UserCheck className="h-4 w-4 text-teal-500" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Customer Name */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">اسم العميل بالكامل</label>
-            <input
-              type="text"
-              required
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="اسم المريض أو العميل"
-              className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
-            />
-          </div>
+            {/* Customer Phone */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">رقم الهاتف (البحث أو الإدخال)</label>
+              <input
+                type="text"
+                required
+                value={customerPhone}
+                onChange={handlePhoneChange}
+                onFocus={() => customerPhone.trim().length >= 1 && setShowCustomerDropdown(true)}
+                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                placeholder="مثال: 01000000000"
+                className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
+              />
+            </div>
 
-          {/* Customer Address */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">العنوان السكني للزيارة</label>
-            <input
-              type="text"
-              value={customerAddress}
-              onChange={(e) => setCustomerAddress(e.target.value)}
-              placeholder="مثال: القاهرة، حي المعادي"
-              className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
-            />
-          </div>
+            {/* Customer Address */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">العنوان السكني للزيارة</label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="مثال: القاهرة، حي المعادي"
+                className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
+              />
+            </div>
 
-          {/* Date */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">تاريخ إصدار الفاتورة</label>
-            <input
-              type="date"
-              required
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
-            />
+            {/* Date */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">تاريخ إصدار الفاتورة</label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="block w-full px-3 py-2.5 glass-input rounded-xl text-sm focus:outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
 
@@ -931,6 +1091,14 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             </div>
           </div>
         </div>
+
+        {/* Customer Picker Modal */}
+        <CustomerPickerModal
+          isOpen={isCustomerModalOpen}
+          onClose={() => setIsCustomerModalOpen(false)}
+          customers={customers}
+          onSelectCustomer={handleSelectCustomer}
+        />
 
         {/* Buttons footer bar */}
         <div className="flex justify-end gap-3 border-t border-white/20 pt-6 bg-white/5 p-6 -mx-6 -mb-6">
