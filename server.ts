@@ -717,6 +717,39 @@ app.put('/api/settings', requireAuth, requirePermission('manage_settings'), (req
   res.json(updatedSettings);
 });
 
+// Backup & Restore Endpoints
+app.get('/api/backup/download', requireAuth, requirePermission('manage_settings'), (req: any, res) => {
+  const { ip, ua } = getRequestMeta(req);
+  const backup = db.getFullBackup();
+  
+  db.logActivity(
+    req.user.username,
+    'تنزيل نسخة احتياطية',
+    `تم تصدير نسخة احتياطية كاملة من قاعدة البيانات (${backup.invoices.length} فاتورة، ${backup.services.length} خدمة، ${backup.customers.length} عميل)`,
+    ip,
+    ua
+  );
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  const filename = `highcare_erb_backup_${dateStr}.json`;
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(JSON.stringify(backup, null, 2));
+});
+
+app.post('/api/backup/restore', requireAuth, requirePermission('manage_settings'), express.json({ limit: '50mb' }), (req: any, res) => {
+  const { ip, ua } = getRequestMeta(req);
+  const backupData = req.body.backupData || req.body;
+
+  try {
+    const result = db.restoreFullBackup(backupData, req.user.username, ip, ua);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'فشل استعادة النسخة الاحتياطية' });
+  }
+});
+
 
 // 8. Reports & Auditing Endpoints
 app.get('/api/reports', requireAuth, requirePermission('view_reports'), (req, res) => {

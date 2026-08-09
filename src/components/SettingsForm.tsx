@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings as SettingsIcon, Save, Heart, ShieldCheck, Mail, Phone, MapPin, RefreshCw, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Heart, ShieldCheck, Mail, Phone, MapPin, RefreshCw, AlertCircle, Database, Download, Upload, FileJson, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { Settings } from '../types';
 
 interface SettingsFormProps {
@@ -24,6 +24,13 @@ export default function SettingsForm({ token }: SettingsFormProps) {
   const [formLoading, setFormLoading] = useState(false);
   const [formSuccess, setFormSuccess] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Backup & Restore State
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreConfirmModal, setRestoreConfirmModal] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string; stats?: any } | null>(null);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -100,6 +107,88 @@ export default function SettingsForm({ token }: SettingsFormProps) {
       setFormError(err.message || 'حدث خطأ غير متوقع أثناء الاتصال بالخادم');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true);
+    setBackupMessage(null);
+    try {
+      const res = await fetch('/api/backup/download', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'فشل تنزيل النسخة الاحتياطية');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.download = `highcare_erb_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setBackupMessage({
+        type: 'success',
+        text: 'تم تنزيل ملف النسخة الاحتياطية الشاملة بنجاح! يمكنك الاحتفاظ به محلياً.'
+      });
+    } catch (err: any) {
+      setBackupMessage({
+        type: 'error',
+        text: err.message || 'حدث خطأ أثناء تنزيل النسخة الاحتياطية'
+      });
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!restoreFile) return;
+    setRestoringBackup(true);
+    setBackupMessage(null);
+    setRestoreConfirmModal(false);
+
+    try {
+      const text = await restoreFile.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error('الملف المرفق ليس بصيغة JSON صحيحة');
+      }
+
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ backupData: json })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'فشل استعادة النسخة الاحتياطية');
+      }
+
+      setBackupMessage({
+        type: 'success',
+        text: data.message || 'تمت استعادة كافة البيانات بنجاح!',
+        stats: data.stats
+      });
+      setRestoreFile(null);
+      fetchSettings();
+    } catch (err: any) {
+      setBackupMessage({
+        type: 'error',
+        text: err.message || 'حدث خطأ أثناء استعادة النسخة الاحتياطية'
+      });
+    } finally {
+      setRestoringBackup(false);
     }
   };
 
@@ -292,6 +381,172 @@ export default function SettingsForm({ token }: SettingsFormProps) {
           </button>
         </div>
       </form>
+
+      {/* Full Database Backup & Restore Section */}
+      <div className="glass-card rounded-2xl shadow-sm overflow-hidden p-6 space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 rounded-xl flex items-center justify-center">
+              <Database className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">النسخ الاحتياطي واستعادة قاعدة البيانات الشاملة</h2>
+              <p className="text-slate-500 text-xs mt-0.5">تصدير واستعادة كافة الفواتير والخدمات والعملاء والمستخدمين والصلاحيات والإعدادات بضغطة زر</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Message Banner */}
+        {backupMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-xl border text-xs font-semibold flex items-start gap-3 ${
+              backupMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}
+          >
+            {backupMessage.type === 'success' ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 space-y-1">
+              <div>{backupMessage.text}</div>
+              {backupMessage.stats && (
+                <div className="text-[11px] font-normal text-emerald-700 flex flex-wrap gap-x-4 gap-y-1 mt-1 pt-1 border-t border-emerald-200/60">
+                  <span>📄 الفواتير المستعادة: <strong>{backupMessage.stats.invoices}</strong></span>
+                  <span>🩺 الخدمات المستعادة: <strong>{backupMessage.stats.services}</strong></span>
+                  <span>👥 العملاء المستعادون: <strong>{backupMessage.stats.customers}</strong></span>
+                  <span>🔐 الحسابات المستعادة: <strong>{backupMessage.stats.users}</strong></span>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setBackupMessage(null)} className="text-slate-400 hover:text-slate-600">
+              <X className="h-4 w-4" />
+            </button>
+          </motion.div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Download Backup Box */}
+          <div className="p-5 bg-slate-50/80 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <Download className="h-4.5 w-4.5 text-teal-600" />
+                <span>تنزيل نسخة احتياطية شاملة (Full Backup JSON)</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                تنزيل ملف واحد يحتوي على كامل قاعدة البيانات (الفواتير، الخدمات، العملاء، المستخدمين والصلاحيات، إعدادات الشركة). يمكنك الاحتفاظ بهذا الملف محلياً واستعادته عند تحديث النظام.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadBackup}
+              disabled={downloadingBackup}
+              className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {downloadingBackup ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>جاري استخراج البيانات والتنزيل...</span>
+                </>
+              ) : (
+                <>
+                  <FileJson className="h-4 w-4" />
+                  <span>تنزيل النسخة الاحتياطية الآن</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Restore Backup Box */}
+          <div className="p-5 bg-slate-50/80 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <Upload className="h-4.5 w-4.5 text-indigo-600" />
+                <span>استعادة نسخة احتياطية (Restore Data)</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                قم برفع ملف النسخة الاحتياطية (JSON) المحفوظ سابقاً لاستعادة جميع البيانات والفواتير المدمجة دفعة واحدة.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setRestoreFile(e.target.files[0]);
+                    setBackupMessage(null);
+                  }
+                }}
+                className="block w-full text-xs text-slate-500 file:mr-0 file:ml-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+              />
+
+              {restoreFile && (
+                <div className="flex items-center justify-between text-xs bg-indigo-50/80 border border-indigo-200/60 p-2.5 rounded-xl text-indigo-900 font-medium">
+                  <span className="truncate max-w-[200px]">📁 {restoreFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRestoreConfirmModal(true)}
+                    disabled={restoringBackup}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold py-1 px-3 rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    استعادة الآن
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmation Modal for Restore */}
+      {restoreConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200"
+            dir="rtl"
+          >
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <h3 className="font-bold text-base text-slate-900">تأكيد استعادة النسخة الاحتياطية</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              تحذير: سيتم استبدال جميع الفواتير، الخدمات، العملاء، المستخدمين والإعدادات الحالية في النظام بالبيانات الموجودة في ملف النسخة الاحتياطية (<strong>{restoreFile?.name}</strong>).
+              <br /><br />
+              هل أنت متأكد من رغبتك في إكمال الاستعادة؟
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setRestoreConfirmModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleRestoreBackup}
+                disabled={restoringBackup}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow transition-all cursor-pointer disabled:opacity-50"
+              >
+                {restoringBackup && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+                <span>نعم، استعادة كافة البيانات</span>
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

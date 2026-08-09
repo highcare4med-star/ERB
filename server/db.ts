@@ -1625,6 +1625,221 @@ export class SQLiteDatabase {
       chartData
     };
   }
+
+  // --- Full Database Backup & Restore Operations ---
+  public getFullBackup() {
+    return {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      appName: 'High Care ERB',
+      settings: this.getSettings(),
+      roles: this.getRoles(),
+      users: this.getUsers(),
+      customers: this.getCustomers(),
+      services: this.getServices(),
+      invoices: this.getInvoices(),
+      activityLogs: this.getActivityLogs()
+    };
+  }
+
+  public restoreFullBackup(data: any, executor: string, ip: string, ua: string) {
+    if (!data || typeof data !== 'object') {
+      throw new Error('ملف النسخة الاحتياطية غير صالح أو فارغ');
+    }
+
+    const { settings, roles, users, customers, services, invoices, activityLogs } = data;
+
+    if (!Array.isArray(invoices) || !Array.isArray(services) || !Array.isArray(users)) {
+      throw new Error('ملف النسخة الاحتياطية لا يحتوي على هيكل البيانات المطلوب (الفواتير، الخدمات، المستخدمين)');
+    }
+
+    this.transaction(() => {
+      // 1. Clear existing table contents
+      this.run('DELETE FROM invoice_items');
+      this.run('DELETE FROM invoices');
+      this.run('DELETE FROM customers');
+      this.run('DELETE FROM services');
+      this.run('DELETE FROM users');
+      this.run('DELETE FROM roles');
+      this.run('DELETE FROM activity_logs');
+
+      // 2. Insert Settings
+      if (settings) {
+        this.run(
+          'INSERT OR REPLACE INTO settings (id, company_name, company_name_en, phone, email, address, vat_number, invoice_policy, primary_color, secondary_color, logo_url) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            settings.companyName || 'هاي كير للخدمات الطبية',
+            settings.companyNameEn || 'High Care Medical Services',
+            settings.phone || '',
+            settings.email || '',
+            settings.address || '',
+            settings.vatNumber || '',
+            settings.invoicePolicy || '',
+            settings.primaryColor || '#0d9488',
+            settings.secondaryColor || '#0f172a',
+            settings.logoUrl || null
+          ]
+        );
+      }
+
+      // 3. Insert Roles
+      const rolesToInsert = Array.isArray(roles) && roles.length > 0 ? roles : DEFAULT_ROLES;
+      rolesToInsert.forEach((r: any) => {
+        this.run(
+          'INSERT OR REPLACE INTO roles (id, name, name_ar, description, permissions) VALUES (?, ?, ?, ?, ?)',
+          [
+            r.id,
+            r.name,
+            r.nameAr || r.name_ar || r.name,
+            r.description || '',
+            JSON.stringify(r.permissions || [])
+          ]
+        );
+      });
+
+      // 4. Insert Users
+      const usersToInsert = Array.isArray(users) && users.length > 0 ? users : DEFAULT_USERS;
+      usersToInsert.forEach((u: any) => {
+        this.run(
+          'INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [
+            u.id,
+            (u.username || 'user').toLowerCase(),
+            u.passwordHash || u.password_hash || hashPassword('123456'),
+            u.fullName || u.full_name || u.username,
+            u.roleId || u.role_id || 'billing',
+            u.isActive !== undefined ? (u.isActive ? 1 : 0) : 1,
+            u.createdAt || u.created_at || new Date().toISOString()
+          ]
+        );
+      });
+
+      // 5. Insert Customers
+      if (Array.isArray(customers)) {
+        customers.forEach((c: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO customers (id, code, name, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              c.id,
+              c.code || null,
+              c.name,
+              c.phone || '',
+              c.address || '',
+              c.notes || '',
+              c.createdAt || c.created_at || new Date().toISOString()
+            ]
+          );
+        });
+      }
+
+      // 6. Insert Services
+      if (Array.isArray(services)) {
+        services.forEach((s: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO services (id, name, default_price, description, category, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+              s.id,
+              s.name,
+              s.defaultPrice ?? s.default_price ?? 0,
+              s.description || '',
+              s.category || 'الخدمات الطبية',
+              s.isActive !== undefined ? (s.isActive ? 1 : 0) : 1
+            ]
+          );
+        });
+      }
+
+      // 7. Insert Invoices & Invoice Items
+      if (Array.isArray(invoices)) {
+        invoices.forEach((i: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO invoices (id, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              i.id,
+              i.date,
+              i.customerId || i.customer_id || '',
+              i.customerName || i.customer_name || '',
+              i.customerPhone || i.customer_phone || '',
+              i.customerAddress || i.customer_address || '',
+              i.subtotal ?? 0,
+              i.discountType || i.discount_type || 'value',
+              i.discountValue ?? i.discount_value ?? 0,
+              i.discountAmount ?? i.discount_amount ?? 0,
+              i.total ?? 0,
+              i.notes || '',
+              i.createdBy || i.created_by || 'admin',
+              i.status || 'new',
+              i.createdAt || i.created_at || new Date().toISOString()
+            ]
+          );
+
+          if (Array.isArray(i.items)) {
+            i.items.forEach((item: any) => {
+              this.run(
+                'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total, service_date, service_end_date, service_date_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                  i.id,
+                  item.serviceId || item.service_id || '',
+                  item.serviceName || item.service_name || '',
+                  item.quantity ?? 1,
+                  item.price ?? 0,
+                  item.total ?? ((item.quantity ?? 1) * (item.price ?? 0)),
+                  item.serviceDate || item.service_date || null,
+                  item.serviceEndDate || item.service_end_date || null,
+                  item.serviceDateType || item.service_date_type || null
+                ]
+              );
+            });
+          }
+        });
+      }
+
+      // 8. Insert Activity Logs
+      if (Array.isArray(activityLogs)) {
+        activityLogs.forEach((l: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO activity_logs (id, username, timestamp, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              l.id,
+              l.username || 'system',
+              l.timestamp || new Date().toISOString(),
+              l.action || '',
+              l.details || '',
+              l.ipAddress || l.ip_address || '127.0.0.1',
+              l.userAgent || l.user_agent || 'System'
+            ]
+          );
+        });
+      }
+
+      // 9. Add restore action log
+      this.run(
+        'INSERT INTO activity_logs (id, username, timestamp, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          `log-restore-${Date.now()}`,
+          executor,
+          new Date().toISOString(),
+          'استعادة نسخة احتياطية',
+          `تم استعادة نسخة احتياطية شاملة بنجاح (${invoices.length} فاتورة، ${services.length} خدمة، ${customers ? customers.length : 0} عميل)`,
+          ip || '127.0.0.1',
+          ua || 'System'
+        ]
+      );
+    });
+
+    this.save();
+
+    return {
+      success: true,
+      message: 'تم استعادة النسخة الاحتياطية الشاملة بنجاح',
+      stats: {
+        invoices: invoices.length,
+        services: services.length,
+        customers: customers ? customers.length : 0,
+        users: users ? users.length : 0
+      }
+    };
+  }
 }
 
 // Single SQLite database instance
