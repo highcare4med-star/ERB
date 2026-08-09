@@ -229,23 +229,32 @@ const DEFAULT_USERS: User[] = [
 ];
 
 const DEFAULT_SERVICES: Service[] = [
+  // --- خدمات باليوم (من - إلى) [خدمات تمريض فقط] ---
+  { id: 'srv-1', name: 'تمريض منزلي لمده 24ساعه', defaultPrice: 2000, description: 'رعاية تمريضية منزلية متكاملة على مدار 24 ساعة', category: 'خدمات باليوم (من - إلى)', isActive: true },
+  { id: 'srv-1-12', name: 'تمريض منزلي لمده 12ساعه', defaultPrice: 1200, description: 'رعاية تمريضية منزلية متكاملة لمدة 12 ساعة', category: 'خدمات باليوم (من - إلى)', isActive: true },
+  { id: 'srv-1-shift', name: 'شيفت تمريض باليوم', defaultPrice: 1500, description: 'متابعة ورعاية تمريضية يومية بالمنزل', category: 'خدمات باليوم (من - إلى)', isActive: true },
+  { id: 'srv-1-escort', name: 'مرافق تمريضي باليوم', defaultPrice: 1600, description: 'مرافقة تمريضية متخصصة يومية للمريض', category: 'خدمات باليوم (من - إلى)', isActive: true },
+  { id: 'srv-1-care', name: 'رعاية تمريضية منزلية باليوم', defaultPrice: 1800, description: 'رعاية وخدمات تمريضية يومية متخصصة بالمنزل', category: 'خدمات باليوم (من - إلى)', isActive: true },
+
   // --- الخدمات الطبية ---
-  { id: 'srv-1', name: 'تمريض منزلي لمده 24ساعه', defaultPrice: 2000, description: 'رعاية تمريضية منزلية متكاملة على مدار 24 ساعة', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-2', name: 'ايجار اسطوانه اكسجين', defaultPrice: 800, description: 'إيجار اسطوانة أكسجين منزلية مع المنظم', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-3', name: 'ملو اسطوانه اكسجين', defaultPrice: 400, description: 'تعبئة وملو اسطوانة أكسجين طبي', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-4', name: 'نقل اسطوانه اكسجين', defaultPrice: 450, description: 'خدمة نقل وتوصيل اسطوانة أكسجين للمنزل', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-5', name: 'زياره طبيب عنايه', defaultPrice: 1800, description: 'كشف واستشارة طبيب عناية مركزة منزلية للحالات الحرجة', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-6', name: 'ايجار مونتور', defaultPrice: 1500, description: 'إيجار جهاز مونيتور لمتابعة العلامات الحيوية', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-7', name: 'ايجار سيرنج بامب', defaultPrice: 1500, description: 'إيجار مضخة المحاليل والأدوية الوريدية (سيرنج بامب)', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-8', name: 'توصيل سيرنج بامب', defaultPrice: 120, description: 'خدمة نقل وتوصيل وتجهيز جهاز السيرنج بامب', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-9', name: 'توصيل اجهزه', defaultPrice: 120, description: 'خدمة توصيل ونقل وتشغيل الأجهزة الطبية المنزلية', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-10', name: 'طبيب مقيم لمده 24 ساعه', defaultPrice: 4500, description: 'مرافقة طبيب مقيم بالمنزل لمتابعة الحالة على مدار 24 ساعة', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-11', name: 'ايجار جهاز تنفس صناعي', defaultPrice: 4000, description: 'إيجار وتوفير جهاز التنفس الصناعي المنزلي', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-12', name: 'ايجار جهاز سكشن', defaultPrice: 850, description: 'إيجار جهاز شفط الإفرازات والمخاط (شفاط سكشن)', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-16', name: 'ايجار سرير طبي اوتوماتك', defaultPrice: 5000, description: 'إيجار سرير طبي كهربائي أوتوماتيك للرعاية المنزلية', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-30', name: 'مرتبه هوائيه', defaultPrice: 1800, description: 'مرتبة هوائية طبية بالمنفاخ للوقاية من قرح الفراش', category: 'الخدمات الطبية', isActive: true },
+
+  // --- الخدمات الطبية ---
+  { id: 'srv-3', name: 'ملو اسطوانه اكسجين', defaultPrice: 400, description: 'تعبئة وملو اسطوانة أكسجين طبي', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-4', name: 'نقل اسطوانه اكسجين', defaultPrice: 450, description: 'خدمة نقل وتوصيل اسطوانة أكسجين للمنزل', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-5', name: 'زياره طبيب عنايه', defaultPrice: 1800, description: 'كشف واستشارة طبيب عناية مركزة منزلية للحالات الحرجة', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-8', name: 'توصيل سيرنج بامب', defaultPrice: 120, description: 'خدمة نقل وتوصيل وتجهيز جهاز السيرنج بامب', category: 'الخدمات الطبية', isActive: true },
+  { id: 'srv-9', name: 'توصيل اجهزه', defaultPrice: 120, description: 'خدمة توصيل ونقل وتشغيل الأجهزة الطبية المنزلية', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-13', name: 'تركيب قسطره cvp', defaultPrice: 3500, description: 'تركيب قسطرة الوريد المركزي CVP بواسطة استشاري متخصص', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-14', name: 'تركيب انبوبه قصبه هوائيه', defaultPrice: 2500, description: 'تركيب أو العناية بأنبوبة القصبة الهوائية بالمنزل', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-15', name: 'زياره استشاري مخ واعصاب', defaultPrice: 2200, description: 'زيارة منزلية لاستشاري أمراض المخ والأعصاب', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-16', name: 'ايجار سرير طبي اوتوماتك', defaultPrice: 5000, description: 'إيجار سرير طبي كهربائي أوتوماتيك للرعاية المنزلية', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-17', name: 'نقل ومشال سرير طبي للدور 16', defaultPrice: 600, description: 'خدمات رفع ونقل السرير الطبي للأدوار العليا', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-18', name: 'توصيل سرير', defaultPrice: 500, description: 'شحن وتوصيل السرير الطبي لموقع العميل', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-19', name: 'زياره دكتور مصطفي', defaultPrice: 2000, description: 'زيارة واستشارة منزلية خاصة بواسطة طبيب استشاري', category: 'الخدمات الطبية', isActive: true },
@@ -259,7 +268,6 @@ const DEFAULT_SERVICES: Service[] = [
   { id: 'srv-27', name: 'وصالت جهاز تنفس صناعي', defaultPrice: 2000, description: 'وصلات وفلاتر ومستلزمات تشغيل جهاز التنفس الصناعي', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-28', name: 'Pigtail', defaultPrice: 2000, description: 'تركيب ومستلزمات قسطرة بكتيل (Pigtail Drain)', category: 'الخدمات الطبية', isActive: true },
   { id: 'srv-29', name: 'دوبلر طرف واحد', defaultPrice: 2100, description: 'فحص الأشعة التلفزيونية الدوبلر للأوعية الدموية طرف واحد', category: 'الخدمات الطبية', isActive: true },
-  { id: 'srv-30', name: 'مرتبه هوائيه', defaultPrice: 1800, description: 'مرتبة هوائية طبية بالمنفاخ للوقاية من قرح الفراش', category: 'الخدمات الطبية', isActive: true },
 
   // --- الأدوية والمستلزمات الطبية ---
   { id: 'sup-1', name: 'درسنج كبير', defaultPrice: 20, description: 'ضماد/درسنج جراحي معقم حجم كبير', category: 'الأدوية والمستلزمات الطبية', isActive: true },
@@ -612,6 +620,35 @@ export class SQLiteDatabase {
     // Update company settings name if legacy
     try {
       this.db.exec("UPDATE settings SET company_name = 'هاي كير للخدمات الطبية', company_name_en = 'High Care Medical Services', invoice_policy = 'تخضع للشروط والأحكام الخاصة بشركة هاي كير للخدمات الطبية.' WHERE id = 1 AND company_name LIKE '%المنزلية%';");
+    } catch (e) {
+      // Ignore
+    }
+
+    // Re-categorize non-nursing services out of 'خدمات باليوم (من - إلى)' to 'الخدمات الطبية'
+    try {
+      this.db.exec(`
+        UPDATE services 
+        SET category = 'الخدمات الطبية' 
+        WHERE category = 'خدمات باليوم (من - إلى)' 
+          AND name NOT LIKE '%تمريض%';
+      `);
+
+      // Ensure nursing services are in 'خدمات باليوم (من - إلى)'
+      const nursingServices = [
+        { id: 'srv-1', name: 'تمريض منزلي لمده 24ساعه', defaultPrice: 2000, description: 'رعاية تمريضية منزلية متكاملة على مدار 24 ساعة', category: 'خدمات باليوم (من - إلى)', isActive: 1 },
+        { id: 'srv-1-12', name: 'تمريض منزلي لمده 12ساعه', defaultPrice: 1200, description: 'رعاية تمريضية منزلية متكاملة لمدة 12 ساعة', category: 'خدمات باليوم (من - إلى)', isActive: 1 },
+        { id: 'srv-1-shift', name: 'شيفت تمريض باليوم', defaultPrice: 1500, description: 'متابعة ورعاية تمريضية يومية بالمنزل', category: 'خدمات باليوم (من - إلى)', isActive: 1 },
+        { id: 'srv-1-escort', name: 'مرافق تمريضي باليوم', defaultPrice: 1600, description: 'مرافقة تمريضية متخصصة يومية للمريض', category: 'خدمات باليوم (من - إلى)', isActive: 1 },
+        { id: 'srv-1-care', name: 'رعاية تمريضية منزلية باليوم', defaultPrice: 1800, description: 'رعاية وخدمات تمريضية يومية متخصصة بالمنزل', category: 'خدمات باليوم (من - إلى)', isActive: 1 },
+      ];
+
+      nursingServices.forEach(s => {
+        this.run(
+          'INSERT OR REPLACE INTO services (id, name, default_price, description, category, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+          [s.id, s.name, s.defaultPrice, s.description, s.category, s.isActive]
+        );
+      });
+      this.save();
     } catch (e) {
       // Ignore
     }

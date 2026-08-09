@@ -229,7 +229,8 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
                   onChange={(e) => setFormCategory(e.target.value)}
                   className="block w-full px-3 py-2 glass-input rounded-xl text-sm focus:outline-none font-bold text-slate-800"
                 >
-                  <option value="الخدمات الطبية">الخدمات الطبية</option>
+                  <option value="الخدمات الطبية">الخدمات الطبية (زيارات ومتابعات)</option>
+                  <option value="خدمات باليوم (من - إلى)">خدمات باليوم (تأخذ تاريخ من - إلى)</option>
                   <option value="الأدوية والمستلزمات الطبية">الأدوية والمستلزمات الطبية</option>
                 </select>
               </div>
@@ -321,7 +322,7 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
 
           {/* Category Tabs */}
           <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
-            {['الكل', 'الخدمات الطبية', 'الأدوية والمستلزمات الطبية'].map((cat) => (
+            {['الكل', 'الخدمات الطبية', 'خدمات باليوم (من - إلى)', 'الأدوية والمستلزمات الطبية'].map((cat) => (
               <button
                 key={cat}
                 type="button"
@@ -380,6 +381,8 @@ export default function ServiceList({ token, userPermissions }: ServiceListProps
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         srv.category === 'الأدوية والمستلزمات الطبية'
                           ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : srv.category === 'خدمات باليوم (من - إلى)'
+                          ? 'bg-indigo-50 text-indigo-800 border border-indigo-200'
                           : 'bg-teal-50 text-teal-800 border border-teal-200'
                       }`}>
                         {srv.category || 'الخدمات الطبية'}

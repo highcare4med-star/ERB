@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart, ChevronDown, Check, Minus, Stethoscope, Pill } from 'lucide-react';
+import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart, ChevronDown, Check, Minus, Stethoscope, Pill, Calendar } from 'lucide-react';
 import { Invoice, InvoiceItem, Service, Customer } from '../types';
 
 interface ServicePickerModalProps {
@@ -86,6 +86,7 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
               {[
                 { id: 'الكل', label: 'الكل' },
                 { id: 'الخدمات الطبية', label: '🩺 الخدمات الطبية' },
+                { id: 'خدمات باليوم (من - إلى)', label: '📅 خدمات باليوم (من - إلى)' },
                 { id: 'الأدوية والمستلزمات الطبية', label: '💊 الأدوية والمستلزمات' }
               ].map(cat => (
                 <button
@@ -115,6 +116,7 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
               filteredServices.map(srv => {
                 const isSelected = selectedServiceId === srv.id;
                 const isSupply = srv.category === 'الأدوية والمستلزمات الطبية';
+                const isDaily = srv.category === 'خدمات باليوم (من - إلى)';
                 return (
                   <div
                     key={srv.id}
@@ -130,15 +132,23 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
                   >
                     <div className="flex items-start gap-3 min-w-0 pr-1">
                       <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                        isSupply ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                        isSupply
+                          ? 'bg-amber-100 text-amber-800'
+                          : isDaily
+                          ? 'bg-indigo-100 text-indigo-800'
+                          : 'bg-teal-100 text-teal-800'
                       }`}>
-                        {isSupply ? <Pill className="h-5 w-5" /> : <Stethoscope className="h-5 w-5" />}
+                        {isSupply ? <Pill className="h-5 w-5" /> : isDaily ? <Calendar className="h-5 w-5" /> : <Stethoscope className="h-5 w-5" />}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-bold text-slate-900 text-sm">{srv.name}</h4>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isSupply ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-teal-50 text-teal-800 border border-teal-200'
+                            isSupply
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : isDaily
+                              ? 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                              : 'bg-teal-50 text-teal-800 border border-teal-200'
                           }`}>
                             {srv.category || 'الخدمات الطبية'}
                           </span>
@@ -514,27 +524,37 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
 
   const handleSelectServiceForItem = (index: number, srv: Service) => {
     const updated = [...items];
-    const isSupply = srv.category === 'الأدوية والمستلزمات الطبية';
     const currentItem = updated[index] || {};
     const sDate = currentItem.serviceDate || date;
-    const dateType = currentItem.serviceDateType || 'single';
-    const eDate = currentItem.serviceEndDate || (dateType === 'range' ? sDate : '');
+    const isDailyCategory = srv.category === 'خدمات باليوم (من - إلى)';
 
-    let qty = currentItem.quantity || 1;
-    if (!isSupply && dateType === 'range' && sDate && eDate) {
-      qty = calculateDaysCount(sDate, eDate);
+    if (isDailyCategory) {
+      const eDate = currentItem.serviceEndDate || sDate;
+      const daysCount = calculateDaysCount(sDate, eDate);
+
+      updated[index] = {
+        ...currentItem,
+        serviceId: srv.id,
+        serviceName: srv.name,
+        price: srv.defaultPrice,
+        quantity: daysCount,
+        serviceDate: sDate,
+        serviceEndDate: eDate,
+        serviceDateType: 'range'
+      };
+    } else {
+      updated[index] = {
+        ...currentItem,
+        serviceId: srv.id,
+        serviceName: srv.name,
+        price: srv.defaultPrice,
+        quantity: currentItem.quantity || 1,
+        serviceDate: sDate,
+        serviceEndDate: '',
+        serviceDateType: 'single'
+      };
     }
 
-    updated[index] = {
-      ...currentItem,
-      serviceId: srv.id,
-      serviceName: srv.name,
-      price: srv.defaultPrice,
-      quantity: qty,
-      serviceDate: sDate,
-      serviceEndDate: eDate,
-      serviceDateType: dateType
-    };
     setItems(updated);
   };
 
@@ -550,20 +570,23 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
       item.serviceDate = date;
     }
 
-    if (field === 'serviceDateType' && value === 'range') {
+    const currentSrv = services.find(s => s.id === item.serviceId);
+    const isDailyCategory = currentSrv?.category === 'خدمات باليوم (من - إلى)';
+
+    if (isDailyCategory) {
+      item.serviceDateType = 'range';
       if (!item.serviceEndDate) {
         item.serviceEndDate = item.serviceDate;
       }
-    }
-
-    // Auto-calculate quantity if medical service (not supply) & date range
-    const currentSrv = services.find(s => s.id === item.serviceId);
-    const isSupply = currentSrv?.category === 'الأدوية والمستلزمات الطبية';
-
-    if (!isSupply && item.serviceDateType === 'range') {
+      // Calculate quantity automatically as number of days ONLY for daily nursing services category
       const sDate = item.serviceDate || date;
       const eDate = item.serviceEndDate || sDate;
       item.quantity = calculateDaysCount(sDate, eDate);
+    } else if (item.serviceDateType === 'range') {
+      if (!item.serviceEndDate) {
+        item.serviceEndDate = item.serviceDate;
+      }
+      // For standard categories (medical services/supplies), quantity is NOT overridden automatically by date range
     }
 
     updated[index] = item;
@@ -813,6 +836,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             {items.map((item, idx) => {
               const currentSrv = services.find(s => s.id === item.serviceId);
               const isSupply = currentSrv?.category === 'الأدوية والمستلزمات الطبية';
+              const isDaily = currentSrv?.category === 'خدمات باليوم (من - إلى)';
               return (
                 <div key={idx} className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
                   {/* Card Header */}
@@ -844,7 +868,11 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                           <div className="font-bold text-slate-900 text-xs truncate">{item.serviceName}</div>
                           {currentSrv?.category && (
                             <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold mt-0.5 ${
-                              isSupply ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                              isSupply
+                                ? 'bg-amber-100 text-amber-800'
+                                : isDaily
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : 'bg-teal-100 text-teal-800'
                             }`}>
                               {currentSrv.category}
                             </span>
@@ -861,10 +889,16 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                   </div>
 
                   {/* Date Selector */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-bold text-slate-500">تاريخ الخدمة</label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-slate-500">
+                        {isDaily ? 'فترة الخدمة (تاريخ من - إلى)' : 'تاريخ الخدمة'}
+                      </label>
+                      {isDaily ? (
+                        <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-100">
+                          محسوبة باليوم تلقائياً
+                        </span>
+                      ) : (
                         <select
                           value={item.serviceDateType || 'single'}
                           onChange={(e) => handleItemValueChange(idx, 'serviceDateType', e.target.value)}
@@ -873,40 +907,49 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                           <option value="single">تاريخ محدد</option>
                           <option value="range">فترة (من - إلى)</option>
                         </select>
-                      </div>
-                      
-                      {item.serviceDateType === 'range' ? (
-                        <div className="flex items-center gap-1">
+                      )}
+                    </div>
+                    
+                    {isDaily || item.serviceDateType === 'range' ? (
+                      <div className="flex items-center gap-1">
+                        <div className="flex-1">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">من تاريخ:</span>
                           <input
                             type="date"
                             value={item.serviceDate || date}
                             onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
                             className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
                           />
-                          <span className="text-xs text-slate-500 font-bold">إلى</span>
+                        </div>
+                        <span className="text-xs text-slate-400 font-bold mt-4">إلى</span>
+                        <div className="flex-1">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">إلى تاريخ:</span>
                           <input
                             type="date"
-                            value={item.serviceEndDate || ''}
+                            value={item.serviceEndDate || item.serviceDate || date}
                             onChange={(e) => handleItemValueChange(idx, 'serviceEndDate', e.target.value)}
                             className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
                           />
                         </div>
-                      ) : (
-                        <input
-                          type="date"
-                          value={item.serviceDate || date}
-                          onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
-                          className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
-                        />
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <input
+                        type="date"
+                        value={item.serviceDate || date}
+                        onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                        className="py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs w-full text-center font-mono font-bold"
+                      />
+                    )}
                   </div>
 
                   {/* Quantity & Price Grid */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     {/* Quantity Stepper */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-500 mb-1">الكمية</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-slate-500">الكمية</label>
+                        {isDaily && <span className="text-[10px] text-indigo-600 font-bold">({item.quantity} يوم)</span>}
+                      </div>
                       <div className="flex items-center bg-slate-100 rounded-xl border border-slate-200 p-0.5">
                         <button
                           type="button"
@@ -974,95 +1017,113 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-white/10 transition-colors align-top">
-                    <td className="py-3 px-3">
-                      <ServiceCombobox
-                        services={services}
-                        selectedServiceId={item.serviceId}
-                        selectedServiceName={item.serviceName}
-                        onOpenModal={() => setActiveModalItemIndex(idx)}
-                        onSelect={(srv) => handleSelectServiceForItem(idx, srv)}
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1 text-[11px]">
-                          <select
-                            value={item.serviceDateType || 'single'}
-                            onChange={(e) => handleItemValueChange(idx, 'serviceDateType', e.target.value)}
-                            className="py-1 px-1.5 glass-input rounded text-[11px] bg-white/70 border border-slate-200 text-slate-800 font-medium"
-                          >
-                            <option value="single">تاريخ محدد</option>
-                            <option value="range">فترة (من - إلى)</option>
-                          </select>
-                        </div>
-                        
-                        {item.serviceDateType === 'range' ? (
-                          <div className="flex items-center gap-1">
+                {items.map((item, idx) => {
+                  const currentSrv = services.find(s => s.id === item.serviceId);
+                  const isDaily = currentSrv?.category === 'خدمات باليوم (من - إلى)';
+                  return (
+                    <tr key={idx} className="hover:bg-white/10 transition-colors align-top">
+                      <td className="py-3 px-3">
+                        <ServiceCombobox
+                          services={services}
+                          selectedServiceId={item.serviceId}
+                          selectedServiceName={item.serviceName}
+                          onOpenModal={() => setActiveModalItemIndex(idx)}
+                          onSelect={(srv) => handleSelectServiceForItem(idx, srv)}
+                        />
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="space-y-1.5">
+                          {!isDaily && (
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <select
+                                value={item.serviceDateType || 'single'}
+                                onChange={(e) => handleItemValueChange(idx, 'serviceDateType', e.target.value)}
+                                className="py-1 px-1.5 glass-input rounded text-[11px] bg-white/70 border border-slate-200 text-slate-800 font-medium"
+                              >
+                                <option value="single">تاريخ محدد</option>
+                                <option value="range">فترة (من - إلى)</option>
+                              </select>
+                            </div>
+                          )}
+                          
+                          {isDaily || item.serviceDateType === 'range' ? (
+                            <div className="space-y-1">
+                              {isDaily && (
+                                <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-bold border border-indigo-100 inline-block">
+                                  فترة باليوم (تاريخ من - إلى)
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="date"
+                                  value={item.serviceDate || date}
+                                  onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
+                                  className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
+                                  title="من تاريخ"
+                                />
+                                <span className="text-xs text-slate-500 font-bold">إلى</span>
+                                <input
+                                  type="date"
+                                  value={item.serviceEndDate || item.serviceDate || date}
+                                  onChange={(e) => handleItemValueChange(idx, 'serviceEndDate', e.target.value)}
+                                  className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
+                                  title="إلى تاريخ"
+                                />
+                              </div>
+                            </div>
+                          ) : (
                             <input
                               type="date"
                               value={item.serviceDate || date}
                               onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
-                              className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
-                              title="من تاريخ"
+                              className="py-1 px-2 glass-input rounded-lg text-xs w-full text-center font-mono"
                             />
-                            <span className="text-xs text-slate-500 font-bold">إلى</span>
-                            <input
-                              type="date"
-                              value={item.serviceEndDate || ''}
-                              onChange={(e) => handleItemValueChange(idx, 'serviceEndDate', e.target.value)}
-                              className="py-1 px-1.5 glass-input rounded text-xs w-full text-center font-mono"
-                              title="إلى تاريخ"
-                            />
-                          </div>
-                        ) : (
-                          <input
-                            type="date"
-                            value={item.serviceDate || date}
-                            onChange={(e) => handleItemValueChange(idx, 'serviceDate', e.target.value)}
-                            className="py-1 px-2 glass-input rounded-lg text-xs w-full text-center font-mono"
-                          />
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={item.quantity}
+                          onChange={(e) => handleItemValueChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
+                          className="block w-full py-1.5 px-2 glass-input rounded-lg text-center text-xs font-extrabold focus:outline-none"
+                        />
+                        {isDaily && (
+                          <span className="text-[10px] text-indigo-700 font-bold block mt-0.5">
+                            {item.quantity} يوم
+                          </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={item.quantity}
-                        onChange={(e) => handleItemValueChange(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                        className="block w-full py-1.5 px-2 glass-input rounded-lg text-center text-xs font-extrabold focus:outline-none"
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        value={item.price}
-                        onChange={(e) => handleItemValueChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                        className="block w-full py-1.5 px-2 glass-input rounded-lg text-xs font-extrabold focus:outline-none"
-                      />
-                    </td>
-                    <td className="py-3 px-3 font-bold text-slate-800 font-mono text-xs pt-4">
-                      {(item.price * item.quantity).toLocaleString()} ج.م
-                    </td>
-                    <td className="py-3 px-3 text-center pt-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItemRow(idx)}
-                        disabled={items.length === 1}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-30 transition-all cursor-pointer p-1"
-                        title="حذف سطر الخدمة"
-                      >
-                        <Trash2 className="h-4.5 w-4.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 px-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          required
+                          value={item.price}
+                          onChange={(e) => handleItemValueChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                          className="block w-full py-1.5 px-2 glass-input rounded-lg text-xs font-extrabold focus:outline-none"
+                        />
+                      </td>
+                      <td className="py-3 px-3 font-bold text-slate-800 font-mono text-xs pt-4">
+                        {(item.price * item.quantity).toLocaleString()} ج.م
+                      </td>
+                      <td className="py-3 px-3 text-center pt-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItemRow(idx)}
+                          disabled={items.length === 1}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-30 transition-all cursor-pointer p-1"
+                          title="حذف سطر الخدمة"
+                        >
+                          <Trash2 className="h-4.5 w-4.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
