@@ -498,12 +498,75 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
     setItems(updated);
   };
 
+  const calculateDaysCount = (startDateStr?: string, endDateStr?: string): number => {
+    if (!startDateStr || !endDateStr) return 1;
+    const sParts = startDateStr.split('-').map(Number);
+    const eParts = endDateStr.split('-').map(Number);
+    if (sParts.length < 3 || eParts.length < 3) return 1;
+
+    const startMs = Date.UTC(sParts[0], sParts[1] - 1, sParts[2]);
+    const endMs = Date.UTC(eParts[0], eParts[1] - 1, eParts[2]);
+    if (isNaN(startMs) || isNaN(endMs) || endMs < startMs) return 1;
+
+    const days = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, days);
+  };
+
+  const handleSelectServiceForItem = (index: number, srv: Service) => {
+    const updated = [...items];
+    const isSupply = srv.category === 'الأدوية والمستلزمات الطبية';
+    const currentItem = updated[index] || {};
+    const sDate = currentItem.serviceDate || date;
+    const dateType = currentItem.serviceDateType || 'single';
+    const eDate = currentItem.serviceEndDate || (dateType === 'range' ? sDate : '');
+
+    let qty = currentItem.quantity || 1;
+    if (!isSupply && dateType === 'range' && sDate && eDate) {
+      qty = calculateDaysCount(sDate, eDate);
+    }
+
+    updated[index] = {
+      ...currentItem,
+      serviceId: srv.id,
+      serviceName: srv.name,
+      price: srv.defaultPrice,
+      quantity: qty,
+      serviceDate: sDate,
+      serviceEndDate: eDate,
+      serviceDateType: dateType
+    };
+    setItems(updated);
+  };
+
   const handleItemValueChange = (index: number, field: string, value: any) => {
     const updated = [...items];
-    updated[index] = {
-      ...updated[index],
+    const current = updated[index] || {};
+    const item = {
+      ...current,
       [field]: value
     };
+
+    if (!item.serviceDate) {
+      item.serviceDate = date;
+    }
+
+    if (field === 'serviceDateType' && value === 'range') {
+      if (!item.serviceEndDate) {
+        item.serviceEndDate = item.serviceDate;
+      }
+    }
+
+    // Auto-calculate quantity if medical service (not supply) & date range
+    const currentSrv = services.find(s => s.id === item.serviceId);
+    const isSupply = currentSrv?.category === 'الأدوية والمستلزمات الطبية';
+
+    if (!isSupply && item.serviceDateType === 'range') {
+      const sDate = item.serviceDate || date;
+      const eDate = item.serviceEndDate || sDate;
+      item.quantity = calculateDaysCount(sDate, eDate);
+    }
+
+    updated[index] = item;
     setItems(updated);
   };
 
@@ -543,7 +606,20 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
       return;
     }
 
-    const cleanItems = items.filter(item => item.serviceId !== '');
+    const cleanItems = items
+      .filter(item => item.serviceId !== '')
+      .map(item => {
+        const sDate = item.serviceDate || date;
+        const dateType = item.serviceDateType || (item.serviceEndDate ? 'range' : 'single');
+        const isRange = dateType === 'range';
+        const eDate = isRange ? (item.serviceEndDate || sDate) : undefined;
+        return {
+          ...item,
+          serviceDate: sDate,
+          serviceEndDate: eDate,
+          serviceDateType: isRange ? 'range' : 'single'
+        };
+      });
     if (cleanItems.length === 0) {
       setError('يرجى إضافة خدمة واحدة على الأقل في جدول الخدمات');
       return;
@@ -717,14 +793,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
           selectedServiceId={activeModalItemIndex !== null ? items[activeModalItemIndex]?.serviceId : undefined}
           onSelectService={(srv) => {
             if (activeModalItemIndex !== null) {
-              const updated = [...items];
-              updated[activeModalItemIndex] = {
-                ...updated[activeModalItemIndex],
-                serviceId: srv.id,
-                serviceName: srv.name,
-                price: srv.defaultPrice
-              };
-              setItems(updated);
+              handleSelectServiceForItem(activeModalItemIndex, srv);
             }
           }}
         />
@@ -913,16 +982,7 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
                         selectedServiceId={item.serviceId}
                         selectedServiceName={item.serviceName}
                         onOpenModal={() => setActiveModalItemIndex(idx)}
-                        onSelect={(srv) => {
-                          const updated = [...items];
-                          updated[idx] = {
-                            ...updated[idx],
-                            serviceId: srv.id,
-                            serviceName: srv.name,
-                            price: srv.defaultPrice
-                          };
-                          setItems(updated);
-                        }}
+                        onSelect={(srv) => handleSelectServiceForItem(idx, srv)}
                       />
                     </td>
                     <td className="py-3 px-3">

@@ -46,6 +46,9 @@ export interface InvoiceItem {
   quantity: number;
   price: number;
   total: number;
+  serviceDate?: string;
+  serviceEndDate?: string;
+  serviceDateType?: string;
 }
 
 export interface Invoice {
@@ -544,7 +547,10 @@ export class SQLiteDatabase {
         service_name TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         price REAL NOT NULL,
-        total REAL NOT NULL
+        total REAL NOT NULL,
+        service_date TEXT,
+        service_end_date TEXT,
+        service_date_type TEXT
       );
 
       CREATE TABLE IF NOT EXISTS settings (
@@ -591,6 +597,17 @@ export class SQLiteDatabase {
     } catch (e) {
       // Column code already exists
     }
+
+    // Safe column migration for invoice_items table
+    try {
+      this.db.exec("ALTER TABLE invoice_items ADD COLUMN service_date TEXT;");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE invoice_items ADD COLUMN service_end_date TEXT;");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE invoice_items ADD COLUMN service_date_type TEXT;");
+    } catch (e) {}
 
     // Update company settings name if legacy
     try {
@@ -1100,7 +1117,10 @@ export class SQLiteDatabase {
         serviceName: row.service_name,
         quantity: Number(row.quantity),
         price: Number(row.price),
-        total: Number(row.total)
+        total: Number(row.total),
+        serviceDate: row.service_date || undefined,
+        serviceEndDate: row.service_end_date || undefined,
+        serviceDateType: row.service_date_type || undefined
       });
     });
     return map;
@@ -1141,7 +1161,10 @@ export class SQLiteDatabase {
       serviceName: row.service_name,
       quantity: Number(row.quantity),
       price: Number(row.price),
-      total: Number(row.total)
+      total: Number(row.total),
+      serviceDate: row.service_date || undefined,
+      serviceEndDate: row.service_end_date || undefined,
+      serviceDateType: row.service_date_type || undefined
     }));
 
     return {
@@ -1271,8 +1294,8 @@ export class SQLiteDatabase {
 
       newInvoice.items.forEach(item => {
         this.run(
-          'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-          [newInvoice.id, item.serviceId, item.serviceName, item.quantity, item.price, item.total]
+          'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total, service_date, service_end_date, service_date_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [newInvoice.id, item.serviceId, item.serviceName, item.quantity, item.price, item.total, item.serviceDate || null, item.serviceEndDate || null, item.serviceDateType || null]
         );
       });
 
@@ -1328,8 +1351,8 @@ export class SQLiteDatabase {
         this.run('DELETE FROM invoice_items WHERE invoice_id = ?', [id]);
         updatedInvoice.items.forEach(item => {
           this.run(
-            'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, item.serviceId, item.serviceName, item.quantity, item.price, item.total]
+            'INSERT INTO invoice_items (invoice_id, service_id, service_name, quantity, price, total, service_date, service_end_date, service_date_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, item.serviceId, item.serviceName, item.quantity, item.price, item.total, item.serviceDate || null, item.serviceEndDate || null, item.serviceDateType || null]
           );
         });
       }

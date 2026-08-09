@@ -471,9 +471,29 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
               </thead>
               <tbody>
                 {invoice.items.map((item, index) => {
-                  const formattedDate = (item.serviceDateType === 'range' || item.serviceEndDate) && item.serviceEndDate
-                    ? `من ${item.serviceDate || invoice.date} إلى ${item.serviceEndDate}`
-                    : (item.serviceDate || invoice.date);
+                  const cleanDateStr = (str?: string) => {
+                    if (!str) return '';
+                    if (str.includes('-')) {
+                      const parts = str.split('-');
+                      if (parts.length === 3) {
+                        const y = parts[0];
+                        const m = parseInt(parts[1], 10);
+                        const d = parseInt(parts[2], 10);
+                        return `${d}/${m}/${y}`;
+                      }
+                    }
+                    return str;
+                  };
+
+                  const startDate = item.serviceDate || invoice.date;
+                  const endDate = item.serviceEndDate;
+                  const isRange = item.serviceDateType === 'range' || Boolean(endDate);
+                  const sClean = cleanDateStr(startDate);
+                  const eClean = cleanDateStr(endDate || startDate);
+
+                  const formattedDate = isRange
+                    ? `من ${sClean} إلى ${eClean}`
+                    : sClean;
 
                   const bgColor = index % 2 === 0 ? '#ffffff' : '#f0fdf4';
 
@@ -525,8 +545,8 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
                     </tr>
                   )}
                   <tr style={{ backgroundColor: '#047857', color: '#ffffff', fontWeight: 'bold' }}>
-                    <td style={{ padding: '10px 12px', border: '1px solid #047857', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>الإجمالي النهائي المستحق:</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle', fontWeight: '800', fontSize: '15px', fontFamily: 'monospace', color: '#ffffff', border: '1px solid #047857' }}>{invoice.total.toLocaleString()} ج.م</td>
+                    <td style={{ padding: '14px 16px', border: '1px solid #047857', fontSize: '16px', fontWeight: '900', textAlign: 'center', verticalAlign: 'middle', color: '#ffffff' }}>الإجمالي النهائي المستحق:</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', verticalAlign: 'middle', fontWeight: '900', fontSize: '24px', fontFamily: 'monospace', color: '#ffffff', border: '1px solid #047857' }}>{invoice.total.toLocaleString()} ج.م</td>
                   </tr>
                 </tbody>
               </table>

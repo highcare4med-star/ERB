@@ -544,7 +544,10 @@ app.post('/api/invoices', requireAuth, requirePermission('create_invoice'), (req
       serviceName: item.serviceName,
       quantity: parseInt(item.quantity, 10),
       price: parseFloat(item.price),
-      total: parseInt(item.quantity, 10) * parseFloat(item.price)
+      total: parseInt(item.quantity, 10) * parseFloat(item.price),
+      serviceDate: item.serviceDate || undefined,
+      serviceEndDate: item.serviceEndDate || undefined,
+      serviceDateType: item.serviceDateType || undefined
     })),
     subtotal,
     discountType: discountType || 'value',
@@ -598,7 +601,10 @@ app.put('/api/invoices/:id', requireAuth, requirePermission('edit_invoice'), (re
       serviceName: item.serviceName,
       quantity: parseInt(item.quantity, 10),
       price: parseFloat(item.price),
-      total: parseInt(item.quantity, 10) * parseFloat(item.price)
+      total: parseInt(item.quantity, 10) * parseFloat(item.price),
+      serviceDate: item.serviceDate || undefined,
+      serviceEndDate: item.serviceEndDate || undefined,
+      serviceDateType: item.serviceDateType || undefined
     }));
     subtotal = updatedItems.reduce((sum, item) => sum + item.total, 0);
   }
