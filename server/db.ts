@@ -110,7 +110,8 @@ export interface DatabaseSchema {
   rowLocks: RowLock[];
 }
 
-const DB_SQLITE_PATH = path.join(process.cwd(), 'database.sqlite');
+const DB_SQLITE_PATH =
+  process.env.DB_PATH || path.join(process.cwd(), 'database.sqlite');
 const LEGACY_JSON_PATH = path.join(process.cwd(), 'data', 'db.json');
 
 // Helper to encrypt passwords using SHA-256
@@ -377,55 +378,97 @@ export class SQLiteDatabase {
   private db!: SqlJsDatabase;
   private isReady = false;
 
-  public async init() {
-    if (this.isReady) return;
-    const SQL = await initSqlJs();
+public async init() {
+  if (this.isReady) return;
 
-    let fileBuffer: Buffer | null = null;
-    if (fs.existsSync(DB_SQLITE_PATH)) {
-      try {
-        fileBuffer = fs.readFileSync(DB_SQLITE_PATH);
-      } catch (e) {
-        console.error('Error reading database.sqlite:', e);
-      }
+  const SQL = await initSqlJs();
+
+  // Ensure the persistent storage directory exists.
+  fs.mkdirSync(path.dirname(DB_SQLITE_PATH), {
+    recursive: true
+  });
+
+  let fileBuffer: Buffer | null = null;
+
+  if (fs.existsSync(DB_SQLITE_PATH)) {
+    try {
+      fileBuffer = fs.readFileSync(DB_SQLITE_PATH);
+    } catch (error) {
+      console.error('Failed to read SQLite database:', error);
+      throw error;
     }
+  }
 
-    if (fileBuffer) {
-      try {
-        this.db = new SQL.Database(fileBuffer);
-        this.initTablesAndMigrate();
-      } catch (e) {
-        console.error('Database file is corrupt or malformed. Re-initializing new database:', e);
-        try {
-          if (fs.existsSync(DB_SQLITE_PATH)) {
-            fs.renameSync(DB_SQLITE_PATH, DB_SQLITE_PATH + '.bak.' + Date.now());
-          }
-        } catch (_) {}
-        this.db = new SQL.Database();
-        this.initTablesAndMigrate();
-      }
-    } else {
-      this.db = new SQL.Database();
-      this.initTablesAndMigrate();
+  if (fileBuffer && fileBuffer.length > 0) {
+    try {
+      this.db = new SQL.Database(fileBuffer);
+    } catch (error) {
+      console.error(
+        'FATAL: SQLite database is corrupt or malformed. Original file was preserved.',
+        error
+      );
+
+      throw new Error(
+        'Database initialization stopped: existing SQLite database is corrupted. No new database was created.'
+      );
+    }
+  } else {
+    this.db = new SQL.Database();
+  }
+
+  try {
+    this.initTablesAndMigrate();
+
+    // Persist newly initialized databases.
+    if (!fileBuffer || fileBuffer.length === 0) {
+      this.save();
     }
 
     this.isReady = true;
+
+    console.log(`SQLite database initialized at: ${DB_SQLITE_PATH}`);
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    throw error;
   }
+}
 
   // Persist current state of SQLite DB to database.sqlite file on disk
   private save() {
-    if (this.inTransaction) {
-      // Defer export until transaction finishes and commits
-      return;
-    }
-    try {
-      const data = this.db.export();
-      const buffer = Buffer.from(data);
-      fs.writeFileSync(DB_SQLITE_PATH, buffer);
-    } catch (err) {
-      console.error('Failed to save database.sqlite to disk:', err);
-    }
+  if (this.inTransaction) {
+    return;
   }
+
+  const tempPath = `${DB_SQLITE_PATH}.tmp`;
+
+  try {
+    fs.mkdirSync(path.dirname(DB_SQLITE_PATH), {
+      recursive: true
+    });
+
+    const data = this.db.export();
+    const buffer = Buffer.from(data);
+
+    // Write to a temporary file first.
+    fs.writeFileSync(tempPath, buffer);
+
+    // Replace the previous database only after writing succeeds.
+    fs.renameSync(tempPath, DB_SQLITE_PATH);
+
+  } catch (error) {
+    console.error('FATAL: Failed to persist SQLite database:', error);
+
+    try {
+      if (fs.existsSync(tempPath)) {
+        fs.unlinkSync(tempPath);
+      }
+    } catch (cleanupError) {
+      console.error('Failed to clean temporary database file:', cleanupError);
+    }
+
+    throw error;
+  }
+}
 
   private queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
     const stmt = this.db.prepare(sql);
