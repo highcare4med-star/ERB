@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart, ChevronDown, Check, Minus, Stethoscope, Pill, Calendar } from 'lucide-react';
+import { Plus, Trash2, Save, X, Calculator, Search, UserCheck, Heart, ChevronDown, Check, Minus, Stethoscope, Pill, Calendar, RotateCcw } from 'lucide-react';
 import { Invoice, InvoiceItem, Service, Customer } from '../types';
 
 interface ServicePickerModalProps {
@@ -24,6 +24,13 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
 
   if (!isOpen) return null;
 
+  const categories = [
+    { id: 'الكل', label: 'الكل' },
+    { id: 'الخدمات الطبية', label: '🩺 الخدمات الطبية' },
+    { id: 'خدمات باليوم (من - إلى)', label: '📅 خدمات باليوم (من - إلى)' },
+    { id: 'الأدوية والمستلزمات الطبية', label: '💊 المستلزمات الطبية' }
+  ];
+
   const filteredServices = services.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(query.toLowerCase()) || 
                           (s.description || '').toLowerCase().includes(query.toLowerCase());
@@ -45,7 +52,7 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
             <div>
               <h3 className="font-extrabold text-base flex items-center gap-2">
                 <Stethoscope className="h-5 w-5 text-teal-400" />
-                <span>اختر الخدمة أو المستلزم الطبي</span>
+                <span>اختر الخدمة أو الدواء أو المستلزم الطبي</span>
               </h3>
               <p className="text-xs text-slate-300 mt-0.5">انقر على أي عنصر لإضافته مباشرة للفاتورة</p>
             </div>
@@ -83,12 +90,7 @@ function ServicePickerModal({ isOpen, onClose, services, onSelectService, select
 
             {/* Category Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-              {[
-                { id: 'الكل', label: 'الكل' },
-                { id: 'الخدمات الطبية', label: '🩺 الخدمات الطبية' },
-                { id: 'خدمات باليوم (من - إلى)', label: '📅 خدمات باليوم (من - إلى)' },
-                { id: 'الأدوية والمستلزمات الطبية', label: '💊 الأدوية والمستلزمات' }
-              ].map(cat => (
+              {categories.map(cat => (
                 <button
                   key={cat.id}
                   type="button"
@@ -357,6 +359,11 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
   const [services, setServices] = useState<Service[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   
+  // Invoice Type: 'sale' | 'return'
+  const [invoiceType, setInvoiceType] = useState<'sale' | 'return'>('sale');
+  const [originalInvoiceId, setOriginalInvoiceId] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('');
@@ -407,6 +414,9 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
   // Set form values if editing
   useEffect(() => {
     if (editingInvoice) {
+      setInvoiceType(editingInvoice.invoiceType || 'sale');
+      setOriginalInvoiceId(editingInvoice.originalInvoiceId || '');
+      setReturnReason(editingInvoice.returnReason || '');
       setDate(editingInvoice.date);
       setCustomerName(editingInvoice.customerName);
       setCustomerPhone(editingInvoice.customerPhone);
@@ -629,6 +639,11 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
       return;
     }
 
+    if (invoiceType === 'return' && !returnReason.trim()) {
+      setError('يرجى تحديد أو كتابة سبب الإرجاع لفاتورة المرتجع');
+      return;
+    }
+
     const cleanItems = items
       .filter(item => item.serviceId !== '')
       .map(item => {
@@ -667,7 +682,10 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
           items: cleanItems,
           discountType,
           discountValue,
-          notes: notes.trim()
+          notes: notes.trim(),
+          invoiceType,
+          originalInvoiceId: originalInvoiceId.trim() || undefined,
+          returnReason: invoiceType === 'return' ? returnReason.trim() : undefined
         })
       });
 
@@ -690,10 +708,10 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
       <div className="p-6 border-b border-white/25 flex justify-between items-center bg-white/10">
         <div>
           <h1 className="text-xl font-bold text-slate-900">
-            {editingInvoice ? `تعديل الفاتورة رقم ${editingInvoice.id}` : 'إصدار فاتورة طبية جديدة'}
+            {editingInvoice ? `تعديل الفاتورة رقم ${editingInvoice.id}` : (invoiceType === 'return' ? 'إصدار فاتورة مرتجع (استرداد أدوية / خدمات)' : 'إصدار فاتورة طبية جديدة')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {editingInvoice ? 'يرجى مراجعة وتحديث حقول الفاتورة المقفلة مؤقتاً لتعديلك' : 'تعبئة بيانات العميل وإضافة الخدمات الطبية المقدمة له'}
+            {editingInvoice ? 'يرجى مراجعة وتحديث حقول الفاتورة المقفلة مؤقتاً لتعديلك' : (invoiceType === 'return' ? 'تسجيل إرجاع أدوية أو إلغاء خدمات للحالة وتعديل حساب الفاتورة' : 'تعبئة بيانات العميل وإضافة الخدمات الطبية المقدمة له')}
           </p>
         </div>
         <button 
@@ -710,6 +728,120 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             {error}
           </div>
         )}
+
+        {/* Invoice Type & Mode Selector (Sale vs Return) */}
+        <div className={`p-4 rounded-2xl border transition-all ${
+          invoiceType === 'return' 
+            ? 'bg-amber-50/90 border-amber-300 shadow-sm' 
+            : 'bg-white/50 border-white/60 shadow-2xs'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">نوع الفاتورة والعملية المالية</span>
+              <h3 className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                {invoiceType === 'return' ? (
+                  <>
+                    <RotateCcw className="h-4 w-4 text-amber-600" />
+                    <span className="text-amber-900">فاتورة مرتجع (استرداد أدوية / خدمات مسترجعة)</span>
+                  </>
+                ) : (
+                  <span>فاتورة مبيعات وخدمات طبية عادية</span>
+                )}
+              </h3>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setInvoiceType('sale')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  invoiceType === 'sale'
+                    ? 'bg-white text-teal-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                فاتورة مبيعات عادية
+              </button>
+              <button
+                type="button"
+                onClick={() => setInvoiceType('return')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  invoiceType === 'return'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-amber-700 hover:text-amber-900'
+                }`}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>فاتورة مرتجع أدوية (Return)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Return Invoice Specific Inputs */}
+          {invoiceType === 'return' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-4 pt-4 border-t border-amber-200/80 space-y-3"
+            >
+              <div className="p-3 bg-amber-100/60 border border-amber-200 text-amber-900 rounded-xl text-xs font-medium flex items-start gap-2">
+                <RotateCcw className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>تنبيه فاتورة المرتجع:</strong> هذه الفاتورة تُسجل كحركة استرجاع/إشعار دائن لحساب الحالة وتُخصم من إجمالي المبيعات تلقائياً.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    رقم الفاتورة الأصلية المراد الإرجاع منها (اختياري / للمطابقة)
+                  </label>
+                  <input
+                    type="text"
+                    value={originalInvoiceId}
+                    onChange={(e) => setOriginalInvoiceId(e.target.value)}
+                    placeholder="مثال: HC-202609-0012"
+                    className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    سبب الإرجاع *
+                  </label>
+                  <input
+                    type="text"
+                    required={invoiceType === 'return'}
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    placeholder="اكتب سبب الإرجاع أو اختر من الأسباب السريعة أدناه"
+                    className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Reason Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs pt-1">
+                <span className="text-[11px] font-bold text-slate-500">أسباب شائعة:</span>
+                {[
+                  'إرجاع أدوية زائدة من الحالة',
+                  'إلغاء جزء من الخدمة الطبية',
+                  'توقف الجرعة الطبية المقررة',
+                  'استبدال صنف دوائي بآخر'
+                ].map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setReturnReason(reason)}
+                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    + {reason}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </div>
 
         {/* Client & Metadata block */}
         <div className="space-y-4">
@@ -1212,6 +1344,19 @@ export default function InvoiceForm({ token, editingInvoice, onCancel, onSuccess
             </div>
           </div>
         </div>
+
+        {/* Service Picker Modal */}
+        <ServicePickerModal
+          isOpen={activeModalItemIndex !== null}
+          onClose={() => setActiveModalItemIndex(null)}
+          services={services}
+          selectedServiceId={activeModalItemIndex !== null ? items[activeModalItemIndex]?.serviceId : undefined}
+          onSelectService={(srv) => {
+            if (activeModalItemIndex !== null) {
+              handleSelectServiceForItem(activeModalItemIndex, srv);
+            }
+          }}
+        />
 
         {/* Customer Picker Modal */}
         <CustomerPickerModal

@@ -166,93 +166,190 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
           </div>
         </div>
 
-        {/* Card 4: Total Revenue (Sensitive Data) */}
-        <div className="glass-card p-6 rounded-2xl shadow-sm relative overflow-hidden">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-slate-500 text-sm font-medium">إجمالي الإيرادات</p>
-              {data.totalRevenue === null ? (
-                <div className="mt-3 text-slate-400 text-xs font-semibold flex items-center gap-1">
-                  <span>غير مصرح للاستعراض</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mt-2">
-                  <h3 className="text-2xl font-extrabold text-slate-950 font-mono">
-                    {showRevenue ? `${data.totalRevenue.toLocaleString('ar-EG')} جنية مصري` : '•••••••'}
-                  </h3>
-                  <button 
-                    onClick={() => setShowRevenue(!showRevenue)}
-                    className="p-1 text-slate-400 hover:text-slate-600 transition-all rounded-lg hover:bg-slate-50/50 cursor-pointer"
-                    title={showRevenue ? "إخفاء" : "إظهار"}
-                  >
-                    {showRevenue ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              )}
+        {/* Card 4: Total Revenue (Sensitive Data) OR Services Operational Shortcut */}
+        {userPermissions.includes('view_reports') ? (
+          <div className="glass-card p-6 rounded-2xl shadow-sm relative overflow-hidden">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">إجمالي الإيرادات</p>
+                {data.totalRevenue === null ? (
+                  <div className="mt-3 text-slate-400 text-xs font-semibold flex items-center gap-1">
+                    <span>غير مصرح للاستعراض</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-2">
+                    <h3 className="text-2xl font-extrabold text-slate-950 font-mono">
+                      {showRevenue ? `${data.totalRevenue.toLocaleString('ar-EG')} جنية مصري` : '•••••••'}
+                    </h3>
+                    <button 
+                      onClick={() => setShowRevenue(!showRevenue)}
+                      className="p-1 text-slate-400 hover:text-slate-600 transition-all rounded-lg hover:bg-slate-50/50 cursor-pointer"
+                      title={showRevenue ? "إخفاء" : "إظهار"}
+                    >
+                      {showRevenue ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="bg-amber-50/50 text-amber-600 p-3 rounded-xl">
+                <DollarSign className="h-6 w-6" />
+              </div>
             </div>
-            <div className="bg-amber-50/50 text-amber-600 p-3 rounded-xl">
-              <DollarSign className="h-6 w-6" />
+            <div className="mt-4 text-xs text-slate-400 flex items-center gap-1">
+              <span>بناءً على الفواتير الفعالة والمصدرة</span>
             </div>
           </div>
-          <div className="mt-4 text-xs text-slate-400 flex items-center gap-1">
-            <span>بناءً على الفواتير الفعالة والمصدرة</span>
+        ) : (
+          <div 
+            onClick={() => onNavigateToTab('services')}
+            className="glass-card glass-card-hover p-6 rounded-2xl shadow-sm cursor-pointer relative overflow-hidden group"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">الخدمات الطبية والتمريض</p>
+                <h3 className="text-2xl font-extrabold text-slate-900 mt-2">قائمة الخدمات</h3>
+              </div>
+              <div className="bg-teal-50/50 text-teal-600 p-3 rounded-xl group-hover:bg-teal-600 group-hover:text-white transition-all">
+                <HeartHandshake className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-teal-600">
+              <span>عرض وتعديل أسعار الخدمات الطبية</span>
+              <ArrowUpRight className="h-3 w-3" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Charts & Top Services Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Latest Revenue Graphic */}
-        <div className="lg:col-span-2 glass-card p-6 rounded-2xl shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">مؤشر الإيرادات للفواتير الأخيرة</h2>
-              <p className="text-xs text-slate-400 mt-1">مقارنة قيم آخر 7 فواتير مصدرة فعالة</p>
+        {userPermissions.includes('view_reports') ? (
+          /* Latest Revenue Graphic for Managers/Accountants */
+          <div className="lg:col-span-2 glass-card p-6 rounded-2xl shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">مؤشر الإيرادات للفواتير الأخيرة</h2>
+                <p className="text-xs text-slate-400 mt-1">مقارنة قيم آخر 7 فواتير مصدرة فعالة</p>
+              </div>
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
             </div>
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
-          </div>
 
-          {activeInvoicesForChart.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[220px] text-slate-400">
-              <ClipboardList className="h-10 w-10 stroke-1 mb-2" />
-              <p className="text-xs">لا توجد فواتير كافية لعرض الرسم البياني</p>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col justify-between min-h-[220px]">
-              {/* Custom SVG Bar Chart */}
-              <div className="relative flex-1 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-white/20">
-                {activeInvoicesForChart.map((inv, idx) => {
-                  const heightPercent = (inv.total / maxTotal) * 100;
-                  return (
-                    <div key={inv.id} className="flex-1 flex flex-col items-center group relative">
-                      {/* Tooltip on hover */}
-                      <div className="absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 font-mono">
-                        {inv.total} جنية مصري
+            {activeInvoicesForChart.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center min-h-[220px] text-slate-400">
+                <ClipboardList className="h-10 w-10 stroke-1 mb-2" />
+                <p className="text-xs">لا توجد فواتير كافية لعرض الرسم البياني</p>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col justify-between min-h-[220px]">
+                {/* Custom SVG Bar Chart */}
+                <div className="relative flex-1 flex items-end justify-between gap-3 pt-6 pb-2 px-2 border-b border-white/20">
+                  {activeInvoicesForChart.map((inv, idx) => {
+                    const heightPercent = (inv.total / maxTotal) * 100;
+                    return (
+                      <div key={inv.id} className="flex-1 flex flex-col items-center group relative">
+                        {/* Tooltip on hover */}
+                        <div className="absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 font-mono">
+                          {inv.total} جنية مصري
+                        </div>
+                        
+                        {/* Visual Bar */}
+                        <motion.div 
+                          initial={{ height: 0 }}
+                          animate={{ height: `${Math.max(heightPercent, 5)}%` }}
+                          transition={{ duration: 0.6, delay: idx * 0.05 }}
+                          className="w-full sm:w-10 bg-teal-600 group-hover:bg-teal-500 rounded-t-lg transition-all shadow-sm shadow-teal-50"
+                        />
+                        
+                        {/* Label */}
+                        <span className="text-[10px] font-semibold font-mono text-slate-500 mt-2 truncate w-full text-center" title={inv.id}>
+                          {inv.id.split('-')[2] || inv.id}
+                        </span>
                       </div>
-                      
-                      {/* Visual Bar */}
-                      <motion.div 
-                        initial={{ height: 0 }}
-                        animate={{ height: `${Math.max(heightPercent, 5)}%` }}
-                        transition={{ duration: 0.6, delay: idx * 0.05 }}
-                        className="w-full sm:w-10 bg-teal-600 group-hover:bg-teal-500 rounded-t-lg transition-all shadow-sm shadow-teal-50"
-                      />
-                      
-                      {/* Label */}
-                      <span className="text-[10px] font-semibold font-mono text-slate-500 mt-2 truncate w-full text-center" title={inv.id}>
-                        {inv.id.split('-')[2] || inv.id}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2 px-1">
+                  <span>الفواتير الأولى ➔</span>
+                  <span>الفواتير الأخيرة ➔</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2 px-1">
-                <span>الفواتير الأولى ➔</span>
-                <span>الفواتير الأخيرة ➔</span>
+            )}
+          </div>
+        ) : (
+          /* Operational Quick Panel for Billing Officers */
+          <div className="lg:col-span-2 glass-card p-6 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="h-5 w-5 text-teal-600" />
+                <h2 className="text-lg font-bold text-slate-900">مهام الفوترة والتشغيل السريع</h2>
               </div>
+              <p className="text-xs text-slate-500 mt-1">
+                الوصول المباشر إلى إصدار الفواتير وسجل العملاء وقائمة الخدمات المتاحة
+              </p>
             </div>
-          )}
-        </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+              {userPermissions.includes('create_invoice') && (
+                <button
+                  onClick={() => onNavigateToTab('new-invoice')}
+                  className="p-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-right space-y-1 transition-all shadow-sm cursor-pointer group"
+                >
+                  <span className="font-bold text-sm block group-hover:translate-x-[-2px] transition-transform">
+                    + إصدار فاتورة زيارة جديدة
+                  </span>
+                  <span className="text-[11px] text-teal-100 block">
+                    تسجيل بنود التمريض ورعاية المسنين وحساب الإجمالي
+                  </span>
+                </button>
+              )}
+
+              {userPermissions.includes('view_invoices') && (
+                <button
+                  onClick={() => onNavigateToTab('invoices')}
+                  className="p-4 rounded-xl bg-white/50 hover:bg-white border border-white/60 text-right space-y-1 transition-all shadow-sm cursor-pointer group"
+                >
+                  <span className="font-bold text-sm text-slate-800 block group-hover:translate-x-[-2px] transition-transform">
+                    📋 سجل الفواتير للطباعة والواتساب
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    متابعة الفواتير المصدرة وإعادة الطباعة أو الإرسال
+                  </span>
+                </button>
+              )}
+
+              {(userPermissions.includes('manage_customers') || userPermissions.includes('view_invoices')) && (
+                <button
+                  onClick={() => onNavigateToTab('customers')}
+                  className="p-4 rounded-xl bg-white/50 hover:bg-white border border-white/60 text-right space-y-1 transition-all shadow-sm cursor-pointer group"
+                >
+                  <span className="font-bold text-sm text-slate-800 block group-hover:translate-x-[-2px] transition-transform">
+                    👥 سجل العملاء وملفات المرضى
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    إضافة عميل جديد وتحديث العنوان والهاتف والملاحظات
+                  </span>
+                </button>
+              )}
+
+              <button
+                onClick={() => onNavigateToTab('services')}
+                className="p-4 rounded-xl bg-white/50 hover:bg-white border border-white/60 text-right space-y-1 transition-all shadow-sm cursor-pointer group"
+              >
+                <span className="font-bold text-sm text-slate-800 block group-hover:translate-x-[-2px] transition-transform">
+                  🩺 دليل الخدمات الطبية والأسعار
+                </span>
+                <span className="text-[11px] text-slate-500 block">
+                  الاطلاع على بنود الرعاية وتعديل الأسعار والخدمات
+                </span>
+              </button>
+            </div>
+
+            <div className="bg-teal-50/60 p-3 rounded-xl border border-teal-100/60 text-[11px] text-teal-800 flex items-center justify-between">
+              <span>نظام الفوترة الإلكتروني معتمد ومحمي لشركة هاي كير للخدمات الطبية</span>
+              <span className="font-mono text-xs">High Care Egypt</span>
+            </div>
+          </div>
+        )}
 
         {/* Top Services Progress bars */}
         <div className="glass-card p-6 rounded-2xl shadow-sm flex flex-col">
@@ -261,41 +358,37 @@ export default function Dashboard({ token, onNavigateToTab, onSelectInvoice, use
             <HeartHandshake className="h-5 w-5 text-teal-500" />
           </div>
           
-          {userPermissions.includes('view_reports') ? (
-            data.topServices.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
-                <p className="text-xs">لا تتوفر بيانات للخدمات حالياً</p>
-              </div>
-            ) : (
-              <div className="flex-1 space-y-4 pt-2">
-                {data.topServices.map((srv, idx) => {
-                  const maxCount = data.topServices[0]?.count || 1;
-                  const percentWidth = (srv.count / maxCount) * 100;
-                  return (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-xs font-semibold">
-                        <span className="text-slate-800 truncate max-w-[180px]">{srv.name}</span>
-                        <span className="text-slate-500 font-mono">{srv.count} زيارة</span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percentWidth}%` }}
-                          transition={{ duration: 0.8 }}
-                          className="h-full bg-teal-600 rounded-full"
-                        />
-                      </div>
+          {data.topServices.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
+              <p className="text-xs">لا تتوفر بيانات للخدمات حالياً</p>
+            </div>
+          ) : (
+            <div className="flex-1 space-y-4 pt-2">
+              {data.topServices.map((srv, idx) => {
+                const maxCount = data.topServices[0]?.count || 1;
+                const percentWidth = (srv.count / maxCount) * 100;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-800 truncate max-w-[180px]">{srv.name}</span>
+                      <span className="text-slate-500 font-mono">{srv.count} زيارة</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentWidth}%` }}
+                        transition={{ duration: 0.8 }}
+                        className="h-full bg-teal-600 rounded-full"
+                      />
+                    </div>
+                    {userPermissions.includes('view_reports') && (
                       <p className="text-[10px] font-mono text-slate-400 text-left">
                         {srv.total.toLocaleString('ar-EG')} جنية مصري
                       </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 p-4">
-              <p className="text-xs">هذا القسم يتطلب صلاحيات مالي أو مدير نظام للاستعراض</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

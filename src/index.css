@@ -89,4 +89,36 @@ body {
   ::-webkit-scrollbar {
     display: none !important;
   }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print\:hidden,
+  aside,
+  nav,
+  header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  #printable-invoice {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
 }

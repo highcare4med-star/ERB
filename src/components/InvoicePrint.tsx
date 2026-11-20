@@ -40,9 +40,16 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
   };
 
   const getCleanFileName = () => {
-    const cName = (invoice?.customerName || 'عميل').trim().replace(/[/\\?%*:|"<>]/g, '_');
-    const code = (invoice?.id || 'HC').trim();
-    return `فاتورة_${cName}_${code}.pdf`;
+    const rawCode = (invoice?.id || 'HC').trim();
+    const cleanCode = rawCode.replace(/[^a-zA-Z0-9_-]/g, '_') || 'HC';
+    const rawNameAscii = (invoice?.customerName || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9\s_-]/g, '')
+      .trim()
+      .replace(/\s+/g, '_');
+    const prefix = invoice?.invoiceType === 'return' ? 'HighCare_Return_Invoice' : 'HighCare_Invoice';
+    const namePart = rawNameAscii ? `_${rawNameAscii}` : '';
+    return `${prefix}_${cleanCode}${namePart}.pdf`;
   };
 
   const getServiceNameStyle = (name: string) => {
@@ -419,12 +426,38 @@ export default function InvoicePrint({ token, invoice, onBack }: InvoicePrintPro
               <h2 className="text-xs font-extrabold text-emerald-800 tracking-wide uppercase" style={{ color: '#047857' }}>High Care Medical Services</h2>
             </div>
 
-            <div style={{ backgroundColor: '#f0fdf4', borderColor: '#047857', borderStyle: 'solid', borderWidth: '1px', padding: '8px 16px', borderRadius: '10px' }} className="text-center shrink-0 min-w-[170px]">
-              <div className="text-[10px] font-extrabold text-black uppercase tracking-wider" style={{ color: '#000000' }}>فاتورة خدمات طبية</div>
+            <div style={{ 
+              backgroundColor: invoice.invoiceType === 'return' ? '#fffbeb' : '#f0fdf4', 
+              borderColor: invoice.invoiceType === 'return' ? '#d97706' : '#047857', 
+              borderStyle: 'solid', 
+              borderWidth: '1px', 
+              padding: '8px 16px', 
+              borderRadius: '10px' 
+            }} className="text-center shrink-0 min-w-[170px]">
+              <div className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: invoice.invoiceType === 'return' ? '#b45309' : '#000000' }}>
+                {invoice.invoiceType === 'return' ? 'فاتورة مرتجع (استرداد)' : 'فاتورة خدمات طبية'}
+              </div>
               <h3 className="text-sm sm:text-base font-black text-black font-mono tracking-tight" dir="ltr" style={{ color: '#000000' }}>{invoice.id}</h3>
               <div className="text-[11px] text-black font-bold" style={{ color: '#000000' }}>تاريخ الإصدار: <span className="font-bold text-black font-mono">{invoice.date}</span></div>
             </div>
           </div>
+
+          {/* Return Invoice Banner if applicable */}
+          {invoice.invoiceType === 'return' && (
+            <div style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', textAlign: 'right' }}>
+              <div style={{ fontWeight: 'bold', color: '#92400e', fontSize: '13px', marginBottom: '4px' }}>
+                إشعار مرتجع واسترداد مالي / مخزني
+              </div>
+              <div style={{ fontSize: '11px', color: '#78350f', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                {invoice.originalInvoiceId && (
+                  <span><strong>رقم الفاتورة الأصلية:</strong> {invoice.originalInvoiceId}</span>
+                )}
+                {invoice.returnReason && (
+                  <span><strong>سبب الإرجاع:</strong> {invoice.returnReason}</span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Structured Table: Customer & Invoice Info */}
           <div className="mb-6 text-center" style={{ marginBottom: '28px' }}>

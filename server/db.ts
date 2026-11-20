@@ -9,6 +9,7 @@ export interface User {
   passwordHash: string;
   fullName: string;
   roleId: string;
+  permissions?: string[];
   isActive: boolean;
   createdAt: string;
 }
@@ -52,7 +53,10 @@ export interface InvoiceItem {
 }
 
 export interface Invoice {
-  id: string; // e.g., HC-202607-0001
+  id: string; // e.g., HC-202607-0001 or HC-RT-202607-0001
+  invoiceType?: 'sale' | 'return';
+  originalInvoiceId?: string;
+  returnReason?: string;
   date: string;
   customerId: string;
   customerName: string;
@@ -99,6 +103,76 @@ export interface RowLock {
   expiresAt: string;
 }
 
+export type RevenuePaymentMethod = 'cash' | 'instapay' | 'e_wallet' | 'bank_transfer';
+
+export interface CaseAccount {
+  id: string;
+  caseName: string;
+  customerId?: string;
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  dailyNursingPrice: number;
+  consultantName: string;
+  totalCost: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface RevenueRecord {
+  id: string;
+  caseName: string;
+  caseAccountId?: string;
+  amount: number;
+  collectorName: string;
+  paymentMethod: RevenuePaymentMethod;
+  collectionDate: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type OutgoingCategory =
+  | 'supplies'
+  | 'pharmacy_meds'
+  | 'labs'
+  | 'doctors'
+  | 'devices'
+  | 'ambulance_blood'
+  | 'abg'
+  | 'physiotherapy'
+  | 'treatment_stores';
+
+export interface OutgoingRecord {
+  id: string;
+  category: OutgoingCategory;
+  caseName: string;
+  caseAccountId?: string;
+  date: string;
+  amount: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ProfitDistributionRecord {
+  id: string;
+  caseName: string;
+  caseAccountId?: string;
+  periodFrom: string;
+  periodTo: string;
+  drMaiAmount: number;
+  drElhamAmount: number;
+  drHanySamirAmount: number;
+  otherDoctorName: string;
+  otherDoctorAmount: number;
+  totalDistributed: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface DatabaseSchema {
   users: User[];
   roles: Role[];
@@ -108,6 +182,10 @@ export interface DatabaseSchema {
   activityLogs: ActivityLog[];
   settings: Settings;
   rowLocks: RowLock[];
+  caseAccounts?: CaseAccount[];
+  revenues?: RevenueRecord[];
+  outgoings?: OutgoingRecord[];
+  profitDistributions?: ProfitDistributionRecord[];
 }
 
 const DB_SQLITE_PATH = path.join(process.cwd(), 'database.sqlite');
@@ -123,8 +201,9 @@ const DEFAULT_ROLES: Role[] = [
     id: 'admin',
     name: 'Admin',
     nameAr: 'مدير النظام',
-    description: 'صلاحيات كاملة للتحكم في النظام والمستخدمين والتقارير',
+    description: 'صلاحيات كاملة للتحكم في النظام والمستخدمين والحسابات والتقارير',
     permissions: [
+      'view_dashboard',
       'create_invoice',
       'edit_invoice',
       'cancel_invoice',
@@ -136,15 +215,56 @@ const DEFAULT_ROLES: Role[] = [
       'manage_users',
       'view_reports',
       'view_logs',
-      'manage_settings'
+      'manage_settings',
+      'manage_accounts'
+    ]
+  },
+  {
+    id: 'company_manager',
+    name: 'Company Manager',
+    nameAr: 'مدير الشركة',
+    description: 'إدارة الشركة بالكامل والاطلاع على قسم الحسابات والتقارير والإعدادات والفواتير',
+    permissions: [
+      'view_dashboard',
+      'create_invoice',
+      'edit_invoice',
+      'cancel_invoice',
+      'view_invoices',
+      'print_pdf',
+      'send_whatsapp',
+      'manage_services',
+      'manage_customers',
+      'manage_users',
+      'view_reports',
+      'view_logs',
+      'manage_settings',
+      'manage_accounts'
+    ]
+  },
+  {
+    id: 'operations_manager',
+    name: 'Operations Supervisor',
+    nameAr: 'مشرف التشغيل والفواتير',
+    description: 'إدارة الفواتير والعملاء والخدمات وتقاريرها دون الحسابات أو لوحة التحكم أو إعدادات الشركة أو سجل العمليات',
+    permissions: [
+      'create_invoice',
+      'edit_invoice',
+      'cancel_invoice',
+      'view_invoices',
+      'print_pdf',
+      'send_whatsapp',
+      'manage_services',
+      'manage_customers',
+      'view_reports'
     ]
   },
   {
     id: 'financial',
     name: 'Financial Manager',
     nameAr: 'المدير المالي',
-    description: 'عرض الفواتير والتقارير وإدارة الخدمات والعملاء وسجل العمليات دون إدارة المستخدمين',
+    description: 'عرض لوحة التحكم والفواتير والتقارير وإدارة الخدمات والعملاء وسجل العمليات بدون قسم الحسابات',
     permissions: [
+      'view_dashboard',
       'view_invoices',
       'print_pdf',
       'send_whatsapp',
@@ -158,22 +278,38 @@ const DEFAULT_ROLES: Role[] = [
     id: 'billing',
     name: 'Billing Officer',
     nameAr: 'موظف إصدار فواتير',
-    description: 'إنشاء وتعديل الفواتير وإدارة الخدمات والعملاء دون صلاحيات الإلغاء أو الإعدادات',
+    description: 'إنشاء وتعديل الفواتير وإدارة العملاء والخدمات دون الحسابات أو الإلغاء أو الإعدادات',
     permissions: [
+      'view_dashboard',
       'create_invoice',
       'edit_invoice',
       'view_invoices',
       'print_pdf',
       'send_whatsapp',
-      'manage_customers'
+      'manage_customers',
+      'manage_services'
+    ]
+  },
+  {
+    id: 'data_entry',
+    name: 'Data Entry',
+    nameAr: 'مدخل بيانات',
+    description: 'تسجيل بيانات الخدمات والعملاء واستعراض الفواتير وطباعتها',
+    permissions: [
+      'view_dashboard',
+      'manage_services',
+      'manage_customers',
+      'view_invoices',
+      'print_pdf'
     ]
   },
   {
     id: 'readonly',
     name: 'Read Only',
     nameAr: 'موظف قراءة فقط',
-    description: 'استعراض الفواتير وطباعتها فقط دون إمكانية الإضافة أو التعديل',
+    description: 'استعراض لوحة التحكم والفواتير وطباعتها فقط دون إمكانية الإضافة أو التعديل',
     permissions: [
+      'view_dashboard',
       'view_invoices',
       'print_pdf'
     ]
@@ -196,6 +332,33 @@ const DEFAULT_USERS: User[] = [
     passwordHash: hashPassword('admin123'),
     fullName: 'مدير النظام الرئيسي',
     roleId: 'admin',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'user-company-manager',
+    username: 'manager',
+    passwordHash: hashPassword('manager123'),
+    fullName: 'مدير الشركة',
+    roleId: 'company_manager',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'user-supervisor',
+    username: 'supervisor',
+    passwordHash: hashPassword('sup123'),
+    fullName: 'مشرف التشغيل والفواتير',
+    roleId: 'operations_manager',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'user-dataentry',
+    username: 'dataentry',
+    passwordHash: hashPassword('data123'),
+    fullName: 'أحمد (مدخل بيانات)',
+    roleId: 'data_entry',
     isActive: true,
     createdAt: new Date().toISOString()
   },
@@ -590,7 +753,75 @@ export class SQLiteDatabase {
         username TEXT NOT NULL,
         expires_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS case_accounts (
+        id TEXT PRIMARY KEY,
+        case_name TEXT NOT NULL,
+        customer_id TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        days_count INTEGER NOT NULL,
+        daily_nursing_price REAL NOT NULL,
+        consultant_name TEXT NOT NULL,
+        total_cost REAL NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS revenues (
+        id TEXT PRIMARY KEY,
+        case_name TEXT NOT NULL,
+        case_account_id TEXT,
+        amount REAL NOT NULL,
+        collector_name TEXT NOT NULL,
+        payment_method TEXT NOT NULL,
+        collection_date TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS outgoings (
+        id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        case_name TEXT NOT NULL,
+        case_account_id TEXT,
+        date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS profit_distributions (
+        id TEXT PRIMARY KEY,
+        case_name TEXT NOT NULL,
+        case_account_id TEXT,
+        period_from TEXT NOT NULL,
+        period_to TEXT NOT NULL,
+        dr_mai_amount REAL NOT NULL DEFAULT 0,
+        dr_elham_amount REAL NOT NULL DEFAULT 0,
+        dr_hany_samir_amount REAL NOT NULL DEFAULT 0,
+        other_doctor_name TEXT NOT NULL DEFAULT '',
+        other_doctor_amount REAL NOT NULL DEFAULT 0,
+        total_distributed REAL NOT NULL DEFAULT 0,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
     `);
+
+    // Safe column migration for invoices table
+    try {
+      this.db.exec("ALTER TABLE invoices ADD COLUMN invoice_type TEXT NOT NULL DEFAULT 'sale';");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE invoices ADD COLUMN original_invoice_id TEXT;");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE invoices ADD COLUMN return_reason TEXT;");
+    } catch (e) {}
 
     // Safe column migration for services table
     try {
@@ -677,6 +908,75 @@ export class SQLiteDatabase {
     } catch (e) {
       // Ignore
     }
+
+    // Ensure users table has permissions column
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN permissions TEXT;');
+      this.save();
+    } catch (e) {
+      // Column already exists or table freshly created
+    }
+
+    // Ensure all default roles are synced into roles table & run one-time permission migrations
+    try {
+      const existingAdminRole = this.queryOne<{ permissions: string }>('SELECT permissions FROM roles WHERE id = ?', ['admin']);
+      const adminPermsBeforeSync: string[] = existingAdminRole?.permissions ? JSON.parse(existingAdminRole.permissions) : [];
+      const needsDashboardMigration = Boolean(existingAdminRole && !adminPermsBeforeSync.includes('view_dashboard'));
+      const existingOpsRole = this.queryOne<{ id: string }>('SELECT id FROM roles WHERE id = ?', ['operations_manager']);
+      const needsNewRoleUsersSeed = !existingOpsRole;
+
+      DEFAULT_ROLES.forEach(r => {
+        this.run(
+          'INSERT OR REPLACE INTO roles (id, name, name_ar, description, permissions) VALUES (?, ?, ?, ?, ?)',
+          [r.id, r.name, r.nameAr, r.description, JSON.stringify(r.permissions || [])]
+        );
+      });
+
+      // One-time migration: preserve view_dashboard for previously customized non-operations users, and strip manage_accounts from non-admin/non-company_manager
+      if (needsDashboardMigration) {
+        const existingUsers = this.queryAll<{ id: string; role_id: string; permissions: string | null }>('SELECT id, role_id, permissions FROM users');
+        existingUsers.forEach(u => {
+          if (u.permissions) {
+            try {
+              let parsed: string[] = JSON.parse(u.permissions);
+              if (Array.isArray(parsed)) {
+                if (u.role_id !== 'operations_manager' && !parsed.includes('view_dashboard')) {
+                  parsed.push('view_dashboard');
+                }
+                if (u.role_id !== 'admin' && u.role_id !== 'company_manager') {
+                  parsed = parsed.filter(p => p !== 'manage_accounts');
+                }
+                this.run('UPDATE users SET permissions = ? WHERE id = ?', [JSON.stringify(parsed), u.id]);
+              }
+            } catch {}
+          }
+        });
+      }
+
+      // One-time seed of new default roles' users (company_manager & operations_manager) if DB already existed
+      if (needsNewRoleUsersSeed) {
+        const existingCount = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users')?.count || 0;
+        if (existingCount > 0) {
+          ['manager', 'supervisor'].forEach(targetUsername => {
+            const defUser = DEFAULT_USERS.find(u => u.username === targetUsername);
+            if (defUser) {
+              const alreadyExists = this.queryOne<{ id: string }>('SELECT id FROM users WHERE username = ?', [defUser.username]);
+              if (!alreadyExists) {
+                this.run(
+                  'INSERT INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  [defUser.id, defUser.username, defUser.passwordHash, defUser.fullName, defUser.roleId, defUser.isActive ? 1 : 0, defUser.createdAt]
+                );
+              }
+            }
+          });
+        }
+      }
+
+      // Clean up legacy pharmacy officer role/user if present in existing DB
+      this.run('DELETE FROM roles WHERE id = ?', ['pharmacy_officer']);
+      this.run('DELETE FROM users WHERE id = ? AND username = ?', ['user-pharmacy', 'pharmacy']);
+      this.save();
+    } catch (e) {}
 
     // Check if database needs data from legacy db.json or default seed
     const userCount = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users')?.count || 0;
@@ -838,6 +1138,36 @@ export class SQLiteDatabase {
       );
       this.save();
     }
+
+    // Ensure all default roles exist and have updated permissions
+    try {
+      DEFAULT_ROLES.forEach(r => {
+        const existingRole = this.queryOne<{ id: string }>('SELECT id FROM roles WHERE id = ?', [r.id]);
+        if (!existingRole) {
+          this.run(
+            'INSERT INTO roles (id, name, name_ar, description, permissions) VALUES (?, ?, ?, ?, ?)',
+            [r.id, r.name, r.nameAr, r.description, JSON.stringify(r.permissions || [])]
+          );
+        } else {
+          this.run(
+            'UPDATE roles SET name = ?, name_ar = ?, description = ?, permissions = ? WHERE id = ?',
+            [r.name, r.nameAr, r.description, JSON.stringify(r.permissions || []), r.id]
+          );
+        }
+      });
+
+      // Ensure dataentry user exists
+      const dataentryUser = this.getUserByUsername('dataentry');
+      if (!dataentryUser) {
+        this.run(
+          'INSERT INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          ['user-dataentry', 'dataentry', hashPassword('data123'), 'أحمد (مدخل بيانات)', 'data_entry', 1, new Date().toISOString()]
+        );
+      }
+      this.save();
+    } catch (e) {
+      console.error('Error synchronizing roles & dataentry user:', e);
+    }
   }
 
   // --- Helper to log activities ---
@@ -852,6 +1182,16 @@ export class SQLiteDatabase {
   }
 
   // --- Users Operations ---
+  private parseUserPermissions(raw: any): string[] | undefined {
+    if (!raw) return undefined;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return Array.isArray(parsed) ? parsed : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   public getUsers(): User[] {
     const rows = this.queryAll('SELECT * FROM users ORDER BY created_at ASC');
     return rows.map(r => ({
@@ -860,6 +1200,7 @@ export class SQLiteDatabase {
       passwordHash: r.password_hash,
       fullName: r.full_name,
       roleId: r.role_id,
+      permissions: this.parseUserPermissions(r.permissions),
       isActive: Boolean(r.is_active),
       createdAt: r.created_at
     }));
@@ -874,6 +1215,7 @@ export class SQLiteDatabase {
       passwordHash: r.password_hash,
       fullName: r.full_name,
       roleId: r.role_id,
+      permissions: this.parseUserPermissions(r.permissions),
       isActive: Boolean(r.is_active),
       createdAt: r.created_at
     };
@@ -888,6 +1230,7 @@ export class SQLiteDatabase {
       passwordHash: r.password_hash,
       fullName: r.full_name,
       roleId: r.role_id,
+      permissions: this.parseUserPermissions(r.permissions),
       isActive: Boolean(r.is_active),
       createdAt: r.created_at
     };
@@ -895,9 +1238,10 @@ export class SQLiteDatabase {
 
   public saveUser(user: User, executor: string, ip: string, ua: string): User {
     const existing = this.getUserById(user.id);
+    const permsJson = (user.permissions && Array.isArray(user.permissions)) ? JSON.stringify(user.permissions) : null;
     this.run(
-      'INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [user.id, user.username.toLowerCase().trim(), user.passwordHash, user.fullName, user.roleId, user.isActive ? 1 : 0, user.createdAt]
+      'INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role_id, is_active, permissions, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [user.id, user.username.toLowerCase().trim(), user.passwordHash, user.fullName, user.roleId, user.isActive ? 1 : 0, permsJson, user.createdAt]
     );
     this.save();
 
@@ -1170,6 +1514,9 @@ export class SQLiteDatabase {
 
     return rows.map(r => ({
       id: r.id,
+      invoiceType: (r.invoice_type as 'sale' | 'return') || 'sale',
+      originalInvoiceId: r.original_invoice_id || undefined,
+      returnReason: r.return_reason || undefined,
       date: r.date,
       customerId: r.customer_id,
       customerName: r.customer_name,
@@ -1206,6 +1553,9 @@ export class SQLiteDatabase {
 
     return {
       id: r.id,
+      invoiceType: (r.invoice_type as 'sale' | 'return') || 'sale',
+      originalInvoiceId: r.original_invoice_id || undefined,
+      returnReason: r.return_reason || undefined,
       date: r.date,
       customerId: r.customer_id,
       customerName: r.customer_name,
@@ -1224,16 +1574,15 @@ export class SQLiteDatabase {
     };
   }
 
-  // Generates automatic invoice ID using Customer Code like HC-YYYYMM-C101-01
-  private generateInvoiceId(dateStr: string, customerCode: string): string {
+  // Generates automatic invoice ID using Customer Code like HC-YYYYMM-C101-01 or HC-RT-YYYYMM-C101-01
+  private generateInvoiceId(dateStr: string, customerCode: string, isReturn: boolean = false): string {
     const date = new Date(dateStr);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const prefix = `HC-${year}${month}-${customerCode}-`;
+    const prefix = isReturn ? `HC-RT-${year}${month}-${customerCode}-` : `HC-${year}${month}-${customerCode}-`;
 
-    const customerInvoices = this.queryAll<{ id: string }>('SELECT id FROM invoices WHERE id LIKE ? OR id LIKE ?', [
-      `${prefix}%`,
-      `%-${customerCode}-%`
+    const customerInvoices = this.queryAll<{ id: string }>('SELECT id FROM invoices WHERE id LIKE ?', [
+      `${prefix}%`
     ]);
 
     let maxNum = 0;
@@ -1298,20 +1647,27 @@ export class SQLiteDatabase {
         }
       }
 
-      const invoiceId = this.generateInvoiceId(invoiceData.date, customerCode);
+      const isReturn = invoiceData.invoiceType === 'return';
+      const invoiceId = this.generateInvoiceId(invoiceData.date, customerCode, isReturn);
 
       const createdAt = new Date().toISOString();
       const newInvoice: Invoice = {
         ...invoiceData,
         id: invoiceId,
+        invoiceType: isReturn ? 'return' : 'sale',
+        originalInvoiceId: invoiceData.originalInvoiceId || undefined,
+        returnReason: invoiceData.returnReason || undefined,
         customerId,
         createdAt
       };
 
       this.run(
-        'INSERT INTO invoices (id, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO invoices (id, invoice_type, original_invoice_id, return_reason, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newInvoice.id,
+          newInvoice.invoiceType || 'sale',
+          newInvoice.originalInvoiceId || null,
+          newInvoice.returnReason || null,
           newInvoice.date,
           newInvoice.customerId,
           newInvoice.customerName,
@@ -1336,10 +1692,17 @@ export class SQLiteDatabase {
         );
       });
 
+      this.save();
+
+      const actionTitle = isReturn ? 'إصدار فاتورة مرتجع' : 'إصدار فاتورة';
+      const actionDesc = isReturn
+        ? `إصدار فاتورة مرتجع رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة ${newInvoice.total} جنيه (السبب: ${newInvoice.returnReason || 'غير محدد'})`
+        : `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} جنيه مصري`;
+
       this.logActivity(
         executor,
-        'إصدار فاتورة',
-        `إصدار فاتورة جديدة رقم ${invoiceId} للعميل ${newInvoice.customerName} بقيمة إجمالية ${newInvoice.total} جنيه مصري`,
+        actionTitle,
+        actionDesc,
         ip,
         ua
       );
@@ -1368,7 +1731,7 @@ export class SQLiteDatabase {
       };
 
       this.run(
-        'UPDATE invoices SET date = ?, customer_name = ?, customer_phone = ?, customer_address = ?, subtotal = ?, discount_type = ?, discount_value = ?, discount_amount = ?, total = ?, notes = ? WHERE id = ?',
+        'UPDATE invoices SET date = ?, customer_name = ?, customer_phone = ?, customer_address = ?, subtotal = ?, discount_type = ?, discount_value = ?, discount_amount = ?, total = ?, notes = ?, invoice_type = ?, original_invoice_id = ?, return_reason = ? WHERE id = ?',
         [
           updatedInvoice.date,
           updatedInvoice.customerName,
@@ -1380,6 +1743,9 @@ export class SQLiteDatabase {
           updatedInvoice.discountAmount,
           updatedInvoice.total,
           updatedInvoice.notes || '',
+          updatedInvoice.invoiceType || 'sale',
+          updatedInvoice.originalInvoiceId || null,
+          updatedInvoice.returnReason || null,
           id
         ]
       );
@@ -1396,6 +1762,7 @@ export class SQLiteDatabase {
 
       // Release any lock held by executor on this invoice
       this.run('DELETE FROM row_locks WHERE invoice_id = ? AND username = ?', [id, executor]);
+      this.save();
 
       this.logActivity(
         executor,
@@ -1554,8 +1921,19 @@ export class SQLiteDatabase {
     const monthCountRow = this.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM invoices WHERE date >= ?', [startOfMonthStr]);
     const thisMonthInvoicesCount = monthCountRow ? monthCountRow.count : 0;
 
-    const totalRevRow = this.queryOne<{ sum: number }>('SELECT SUM(total) as sum FROM invoices WHERE status != ?', ['cancelled']);
-    const totalRevenue = totalRevRow && totalRevRow.sum !== null ? totalRevRow.sum : 0;
+    // Sales vs Returns
+    const totalSalesRow = this.queryOne<{ sum: number }>(
+      "SELECT SUM(total) as sum FROM invoices WHERE status != 'cancelled' AND (invoice_type != 'return' OR invoice_type IS NULL)"
+    );
+    const totalSales = totalSalesRow && totalSalesRow.sum !== null ? totalSalesRow.sum : 0;
+
+    const totalReturnsRow = this.queryOne<{ count: number; sum: number }>(
+      "SELECT COUNT(*) as count, SUM(total) as sum FROM invoices WHERE status != 'cancelled' AND invoice_type = 'return'"
+    );
+    const returnInvoicesCount = totalReturnsRow ? totalReturnsRow.count : 0;
+    const totalReturnAmount = totalReturnsRow && totalReturnsRow.sum !== null ? totalReturnsRow.sum : 0;
+
+    const totalRevenue = totalSales - totalReturnAmount;
 
     const topServicesRows = this.queryAll<{ service_name: string; count: number; total: number }>(`
       SELECT service_name, SUM(quantity) as count, SUM(invoice_items.total) as total
@@ -1580,6 +1958,9 @@ export class SQLiteDatabase {
       todayInvoicesCount,
       thisMonthInvoicesCount,
       totalRevenue,
+      totalSales,
+      returnInvoicesCount,
+      totalReturnAmount,
       topServices,
       latestInvoices
     };
@@ -1631,10 +2012,19 @@ export class SQLiteDatabase {
     const activeInvoices = invoices.filter(i => i.status !== 'cancelled');
     const totalActiveCount = activeInvoices.length;
 
-    const subtotalSum = activeInvoices.reduce((sum, i) => sum + i.subtotal, 0);
-    const discountSum = activeInvoices.reduce((sum, i) => sum + i.discountAmount, 0);
-    const totalRevenueSum = activeInvoices.reduce((sum, i) => sum + i.total, 0);
-    const totalTaxSum = activeInvoices.reduce((sum, i) => sum + (i.total - i.total / 1.14), 0);
+    const returnInvoices = activeInvoices.filter(i => i.invoiceType === 'return');
+    const salesInvoices = activeInvoices.filter(i => i.invoiceType !== 'return');
+
+    const totalSales = salesInvoices.reduce((sum, i) => sum + i.total, 0);
+    const totalReturns = returnInvoices.reduce((sum, i) => sum + i.total, 0);
+    const totalRevenueSum = totalSales - totalReturns;
+
+    const subtotalSum = salesInvoices.reduce((sum, i) => sum + i.subtotal, 0);
+    const discountSum = salesInvoices.reduce((sum, i) => sum + i.discountAmount, 0);
+    const totalTaxSum = activeInvoices.reduce((sum, i) => {
+      const mult = i.invoiceType === 'return' ? -1 : 1;
+      return sum + mult * (i.total - i.total / 1.14);
+    }, 0);
 
     const chartDataMap: Record<string, { date: string; revenue: number; count: number }> = {};
     activeInvoices.forEach(i => {
@@ -1642,7 +2032,8 @@ export class SQLiteDatabase {
       if (!chartDataMap[dateKey]) {
         chartDataMap[dateKey] = { date: dateKey, revenue: 0, count: 0 };
       }
-      chartDataMap[dateKey].revenue += i.total;
+      const mult = i.invoiceType === 'return' ? -1 : 1;
+      chartDataMap[dateKey].revenue += mult * i.total;
       chartDataMap[dateKey].count += 1;
     });
 
@@ -1653,20 +2044,456 @@ export class SQLiteDatabase {
         totalInvoices,
         activeInvoices: totalActiveCount,
         cancelledInvoices,
+        salesInvoicesCount: salesInvoices.length,
+        returnInvoicesCount: returnInvoices.length,
+        totalSales,
+        totalReturns,
         subtotal: subtotalSum,
         discount: discountSum,
         totalRevenue: totalRevenueSum,
-        vatAmount: totalTaxSum
+        vatAmount: Math.max(0, totalTaxSum)
       },
       invoices,
       chartData
     };
   }
 
+  // --- Accounts Operations (Case Accounts & Revenues) ---
+  public calculateInclusiveDays(startDate: string, endDate: string): number {
+    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const sMatch = startDate.match(dateRegex);
+    const eMatch = endDate.match(dateRegex);
+    if (!sMatch || !eMatch) {
+      throw new Error('صيغة التاريخ غير صالحة (يجب أن تكون YYYY-MM-DD)');
+    }
+    const sYear = Number(sMatch[1]), sMonth = Number(sMatch[2]), sDay = Number(sMatch[3]);
+    const eYear = Number(eMatch[1]), eMonth = Number(eMatch[2]), eDay = Number(eMatch[3]);
+    const startUtc = Date.UTC(sYear, sMonth - 1, sDay);
+    const endUtc = Date.UTC(eYear, eMonth - 1, eDay);
+
+    const checkS = new Date(startUtc);
+    const checkE = new Date(endUtc);
+    if (
+      checkS.getUTCFullYear() !== sYear || checkS.getUTCMonth() !== sMonth - 1 || checkS.getUTCDate() !== sDay ||
+      checkE.getUTCFullYear() !== eYear || checkE.getUTCMonth() !== eMonth - 1 || checkE.getUTCDate() !== eDay
+    ) {
+      throw new Error('التاريخ المدخل غير صحيح');
+    }
+
+    if (endUtc < startUtc) {
+      throw new Error('تاريخ الانتهاء يجب أن يكون مساوياً لتاريخ البدء أو بعده');
+    }
+    return Math.round((endUtc - startUtc) / 86400000) + 1;
+  }
+
+  public getCaseAccounts(): CaseAccount[] {
+    const rows = this.queryAll('SELECT * FROM case_accounts ORDER BY start_date DESC, created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      caseName: r.case_name,
+      customerId: r.customer_id || undefined,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      daysCount: Number(r.days_count),
+      dailyNursingPrice: Number(r.daily_nursing_price),
+      consultantName: r.consultant_name,
+      totalCost: Number(r.total_cost),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    }));
+  }
+
+  public getCaseAccountById(id: string): CaseAccount | undefined {
+    const r = this.queryOne('SELECT * FROM case_accounts WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      caseName: r.case_name,
+      customerId: r.customer_id || undefined,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      daysCount: Number(r.days_count),
+      dailyNursingPrice: Number(r.daily_nursing_price),
+      consultantName: r.consultant_name,
+      totalCost: Number(r.total_cost),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    };
+  }
+
+  public saveCaseAccount(account: CaseAccount, executor: string, ip: string, ua: string): CaseAccount {
+    const existing = this.getCaseAccountById(account.id);
+    const daysCount = this.calculateInclusiveDays(account.startDate, account.endDate);
+    const totalCost = Math.round((daysCount * account.dailyNursingPrice) * 100) / 100;
+
+    const record: CaseAccount = {
+      ...account,
+      daysCount,
+      totalCost,
+      notes: account.notes || '',
+      createdBy: existing ? existing.createdBy : account.createdBy,
+      createdAt: existing ? existing.createdAt : account.createdAt
+    };
+
+    this.run(
+      'INSERT OR REPLACE INTO case_accounts (id, case_name, customer_id, start_date, end_date, days_count, daily_nursing_price, consultant_name, total_cost, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        record.id,
+        record.caseName.trim(),
+        record.customerId || null,
+        record.startDate,
+        record.endDate,
+        record.daysCount,
+        record.dailyNursingPrice,
+        record.consultantName.trim(),
+        record.totalCost,
+        record.notes || '',
+        record.createdBy,
+        record.createdAt
+      ]
+    );
+    this.save();
+
+    this.logActivity(
+      executor,
+      existing ? 'تعديل حساب حالة' : 'إضافة حساب حالة',
+      `${existing ? 'تعديل' : 'تسجيل'} حساب الحالة "${record.caseName}" (الاستشاري: ${record.consultantName}، ${record.daysCount} يوم × ${record.dailyNursingPrice} = ${record.totalCost} جنيه)`,
+      ip,
+      ua
+    );
+    return record;
+  }
+
+  public deleteCaseAccount(id: string, executor: string, ip: string, ua: string): boolean {
+    const existing = this.getCaseAccountById(id);
+    if (!existing) return false;
+    this.run('DELETE FROM case_accounts WHERE id = ?', [id]);
+    this.save();
+
+    this.logActivity(
+      executor,
+      'حذف حساب حالة',
+      `حذف حساب الحالة "${existing.caseName}" (${existing.startDate} إلى ${existing.endDate} - الإجمالي: ${existing.totalCost} جنيه)`,
+      ip,
+      ua
+    );
+    return true;
+  }
+
+  public getRevenues(): RevenueRecord[] {
+    const rows = this.queryAll('SELECT * FROM revenues ORDER BY collection_date DESC, created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      amount: Number(r.amount),
+      collectorName: r.collector_name,
+      paymentMethod: r.payment_method as RevenuePaymentMethod,
+      collectionDate: r.collection_date,
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    }));
+  }
+
+  public getRevenueById(id: string): RevenueRecord | undefined {
+    const r = this.queryOne('SELECT * FROM revenues WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      amount: Number(r.amount),
+      collectorName: r.collector_name,
+      paymentMethod: r.payment_method as RevenuePaymentMethod,
+      collectionDate: r.collection_date,
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    };
+  }
+
+  public saveRevenue(revenue: RevenueRecord, executor: string, ip: string, ua: string): RevenueRecord {
+    const existing = this.getRevenueById(revenue.id);
+    const methodLabels: Record<RevenuePaymentMethod, string> = {
+      cash: 'نقدي',
+      instapay: 'تحويل انستا باي',
+      e_wallet: 'محفظة الكترونية',
+      bank_transfer: 'تحويل بنكي'
+    };
+
+    const record: RevenueRecord = {
+      ...revenue,
+      amount: Math.round(revenue.amount * 100) / 100,
+      notes: revenue.notes || '',
+      createdBy: existing ? existing.createdBy : revenue.createdBy,
+      createdAt: existing ? existing.createdAt : revenue.createdAt
+    };
+
+    this.run(
+      'INSERT OR REPLACE INTO revenues (id, case_name, case_account_id, amount, collector_name, payment_method, collection_date, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        record.id,
+        record.caseName.trim(),
+        record.caseAccountId || null,
+        record.amount,
+        record.collectorName.trim(),
+        record.paymentMethod,
+        record.collectionDate,
+        record.notes || '',
+        record.createdBy,
+        record.createdAt
+      ]
+    );
+    this.save();
+
+    this.logActivity(
+      executor,
+      existing ? 'تعديل تحصيل إيراد' : 'تسجيل تحصيل إيراد',
+      `${existing ? 'تعديل' : 'تسجيل'} تحصيل بمبلغ ${record.amount} جنيه للحالة "${record.caseName}" (المحصل: ${record.collectorName} - النوع: ${methodLabels[record.paymentMethod]} - التاريخ: ${record.collectionDate})`,
+      ip,
+      ua
+    );
+    return record;
+  }
+
+  public deleteRevenue(id: string, executor: string, ip: string, ua: string): boolean {
+    const existing = this.getRevenueById(id);
+    if (!existing) return false;
+    this.run('DELETE FROM revenues WHERE id = ?', [id]);
+    this.save();
+
+    this.logActivity(
+      executor,
+      'حذف سجل إيراد',
+      `حذف سجل تحصيل بمبلغ ${existing.amount} جنيه للحالة "${existing.caseName}" بتاريخ ${existing.collectionDate}`,
+      ip,
+      ua
+    );
+    return true;
+  }
+
+  // --- Outgoings / Section 3 Operations ---
+  public getOutgoings(): OutgoingRecord[] {
+    const rows = this.queryAll('SELECT * FROM outgoings ORDER BY date DESC, created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      category: r.category as OutgoingCategory,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      date: r.date,
+      amount: Number(r.amount),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    }));
+  }
+
+  public getOutgoingById(id: string): OutgoingRecord | undefined {
+    const r = this.queryOne('SELECT * FROM outgoings WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      category: r.category as OutgoingCategory,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      date: r.date,
+      amount: Number(r.amount),
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    };
+  }
+
+  public saveOutgoing(outgoing: OutgoingRecord, executor: string, ip: string, ua: string): OutgoingRecord {
+    const existing = this.getOutgoingById(outgoing.id);
+    const categoryLabels: Record<OutgoingCategory, string> = {
+      supplies: 'المستلزمات',
+      pharmacy_meds: 'ادوية الصيدلية',
+      labs: 'تحاليل',
+      doctors: 'اطباء',
+      devices: 'أجهزه',
+      ambulance_blood: 'اسعاف دم وصفائح دمويه',
+      abg: 'ABG',
+      physiotherapy: 'علاج طبيعي',
+      treatment_stores: 'مخازن علاجات'
+    };
+
+    const record: OutgoingRecord = {
+      ...outgoing,
+      amount: Math.round(outgoing.amount * 100) / 100,
+      notes: outgoing.notes || '',
+      createdBy: existing ? existing.createdBy : outgoing.createdBy,
+      createdAt: existing ? existing.createdAt : outgoing.createdAt
+    };
+
+    this.run(
+      'INSERT OR REPLACE INTO outgoings (id, category, case_name, case_account_id, date, amount, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        record.id,
+        record.category,
+        record.caseName.trim(),
+        record.caseAccountId || null,
+        record.date,
+        record.amount,
+        record.notes || '',
+        record.createdBy,
+        record.createdAt
+      ]
+    );
+    this.save();
+
+    this.logActivity(
+      executor,
+      existing ? 'تعديل بند خارج' : 'تسجيل بند خارج',
+      `${existing ? 'تعديل' : 'تسجيل'} مصروف خارج (${categoryLabels[record.category]}) بمبلغ ${record.amount} جنيه للحالة "${record.caseName}" بتاريخ ${record.date}`,
+      ip,
+      ua
+    );
+    return record;
+  }
+
+  public deleteOutgoing(id: string, executor: string, ip: string, ua: string): boolean {
+    const existing = this.getOutgoingById(id);
+    if (!existing) return false;
+    this.run('DELETE FROM outgoings WHERE id = ?', [id]);
+    this.save();
+
+    this.logActivity(
+      executor,
+      'حذف بند خارج',
+      `حذف مصروف خارج بمبلغ ${existing.amount} جنيه للحالة "${existing.caseName}" بتاريخ ${existing.date}`,
+      ip,
+      ua
+    );
+    return true;
+  }
+
+  // --- Profit Distribution / Section 4 Operations ---
+  public getProfitDistributions(): ProfitDistributionRecord[] {
+    const rows = this.queryAll('SELECT * FROM profit_distributions ORDER BY period_to DESC, created_at DESC');
+    return rows.map(r => ({
+      id: r.id,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      periodFrom: r.period_from,
+      periodTo: r.period_to,
+      drMaiAmount: Number(r.dr_mai_amount) || 0,
+      drElhamAmount: Number(r.dr_elham_amount) || 0,
+      drHanySamirAmount: Number(r.dr_hany_samir_amount) || 0,
+      otherDoctorName: r.other_doctor_name || '',
+      otherDoctorAmount: Number(r.other_doctor_amount) || 0,
+      totalDistributed: Number(r.total_distributed) || 0,
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    }));
+  }
+
+  public getProfitDistributionById(id: string): ProfitDistributionRecord | undefined {
+    const r = this.queryOne('SELECT * FROM profit_distributions WHERE id = ?', [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      caseName: r.case_name,
+      caseAccountId: r.case_account_id || undefined,
+      periodFrom: r.period_from,
+      periodTo: r.period_to,
+      drMaiAmount: Number(r.dr_mai_amount) || 0,
+      drElhamAmount: Number(r.dr_elham_amount) || 0,
+      drHanySamirAmount: Number(r.dr_hany_samir_amount) || 0,
+      otherDoctorName: r.other_doctor_name || '',
+      otherDoctorAmount: Number(r.other_doctor_amount) || 0,
+      totalDistributed: Number(r.total_distributed) || 0,
+      notes: r.notes || '',
+      createdBy: r.created_by,
+      createdAt: r.created_at
+    };
+  }
+
+  public saveProfitDistribution(
+    distribution: ProfitDistributionRecord,
+    executor: string,
+    ip: string,
+    ua: string
+  ): ProfitDistributionRecord {
+    this.calculateInclusiveDays(distribution.periodFrom, distribution.periodTo);
+    const existing = this.getProfitDistributionById(distribution.id);
+    const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+
+    const drMaiAmount = round2(distribution.drMaiAmount);
+    const drElhamAmount = round2(distribution.drElhamAmount);
+    const drHanySamirAmount = round2(distribution.drHanySamirAmount);
+    const otherDoctorAmount = round2(distribution.otherDoctorAmount);
+    const totalDistributed = round2(drMaiAmount + drElhamAmount + drHanySamirAmount + otherDoctorAmount);
+
+    const record: ProfitDistributionRecord = {
+      ...distribution,
+      caseName: distribution.caseName.trim(),
+      otherDoctorName: (distribution.otherDoctorName || '').trim(),
+      drMaiAmount,
+      drElhamAmount,
+      drHanySamirAmount,
+      otherDoctorAmount,
+      totalDistributed,
+      notes: distribution.notes || '',
+      createdBy: existing ? existing.createdBy : distribution.createdBy,
+      createdAt: existing ? existing.createdAt : distribution.createdAt
+    };
+
+    this.run(
+      'INSERT OR REPLACE INTO profit_distributions (id, case_name, case_account_id, period_from, period_to, dr_mai_amount, dr_elham_amount, dr_hany_samir_amount, other_doctor_name, other_doctor_amount, total_distributed, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        record.id,
+        record.caseName,
+        record.caseAccountId || null,
+        record.periodFrom,
+        record.periodTo,
+        record.drMaiAmount,
+        record.drElhamAmount,
+        record.drHanySamirAmount,
+        record.otherDoctorName,
+        record.otherDoctorAmount,
+        record.totalDistributed,
+        record.notes || '',
+        record.createdBy,
+        record.createdAt
+      ]
+    );
+    this.save();
+
+    this.logActivity(
+      executor,
+      existing ? 'تعديل توزيع أرباح' : 'تسجيل توزيع أرباح',
+      `${existing ? 'تعديل' : 'تسجيل'} توزيع أرباح للحالة "${record.caseName}" عن المدة (${record.periodFrom} إلى ${record.periodTo}) بإجمالي ${record.totalDistributed} جنيه`,
+      ip,
+      ua
+    );
+    return record;
+  }
+
+  public deleteProfitDistribution(id: string, executor: string, ip: string, ua: string): boolean {
+    const existing = this.getProfitDistributionById(id);
+    if (!existing) return false;
+    this.run('DELETE FROM profit_distributions WHERE id = ?', [id]);
+    this.save();
+
+    this.logActivity(
+      executor,
+      'حذف توزيع أرباح',
+      `حذف سجل توزيع أرباح للحالة "${existing.caseName}" عن المدة (${existing.periodFrom} إلى ${existing.periodTo}) بإجمالي ${existing.totalDistributed} جنيه`,
+      ip,
+      ua
+    );
+    return true;
+  }
+
   // --- Full Database Backup & Restore Operations ---
   public getFullBackup() {
     return {
-      version: '1.0',
+      version: '1.4',
       exportedAt: new Date().toISOString(),
       appName: 'High Care ERB',
       settings: this.getSettings(),
@@ -1675,6 +2502,10 @@ export class SQLiteDatabase {
       customers: this.getCustomers(),
       services: this.getServices(),
       invoices: this.getInvoices(),
+      caseAccounts: this.getCaseAccounts(),
+      revenues: this.getRevenues(),
+      outgoings: this.getOutgoings(),
+      profitDistributions: this.getProfitDistributions(),
       activityLogs: this.getActivityLogs()
     };
   }
@@ -1684,7 +2515,7 @@ export class SQLiteDatabase {
       throw new Error('ملف النسخة الاحتياطية غير صالح أو فارغ');
     }
 
-    const { settings, roles, users, customers, services, invoices, activityLogs } = data;
+    const { settings, roles, users, customers, services, invoices, caseAccounts, revenues, outgoings, profitDistributions, activityLogs } = data;
 
     if (!Array.isArray(invoices) || !Array.isArray(services) || !Array.isArray(users)) {
       throw new Error('ملف النسخة الاحتياطية لا يحتوي على هيكل البيانات المطلوب (الفواتير، الخدمات، المستخدمين)');
@@ -1699,6 +2530,10 @@ export class SQLiteDatabase {
       this.run('DELETE FROM users');
       this.run('DELETE FROM roles');
       this.run('DELETE FROM activity_logs');
+      this.run('DELETE FROM case_accounts');
+      this.run('DELETE FROM revenues');
+      this.run('DELETE FROM outgoings');
+      this.run('DELETE FROM profit_distributions');
 
       // 2. Insert Settings
       if (settings) {
@@ -1790,9 +2625,12 @@ export class SQLiteDatabase {
       if (Array.isArray(invoices)) {
         invoices.forEach((i: any) => {
           this.run(
-            'INSERT OR REPLACE INTO invoices (id, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT OR REPLACE INTO invoices (id, invoice_type, original_invoice_id, return_reason, date, customer_id, customer_name, customer_phone, customer_address, subtotal, discount_type, discount_value, discount_amount, total, notes, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
               i.id,
+              i.invoiceType || i.invoice_type || 'sale',
+              i.originalInvoiceId || i.original_invoice_id || null,
+              i.returnReason || i.return_reason || null,
               i.date,
               i.customerId || i.customer_id || '',
               i.customerName || i.customer_name || '',
@@ -1831,7 +2669,98 @@ export class SQLiteDatabase {
         });
       }
 
-      // 8. Insert Activity Logs
+      // 8. Insert Case Accounts & Revenues (if present in backup)
+      if (Array.isArray(caseAccounts)) {
+        caseAccounts.forEach((ca: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO case_accounts (id, case_name, customer_id, start_date, end_date, days_count, daily_nursing_price, consultant_name, total_cost, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              ca.id,
+              ca.caseName || ca.case_name || '',
+              ca.customerId || ca.customer_id || null,
+              ca.startDate || ca.start_date || '',
+              ca.endDate || ca.end_date || '',
+              ca.daysCount ?? ca.days_count ?? 1,
+              ca.dailyNursingPrice ?? ca.daily_nursing_price ?? 0,
+              ca.consultantName || ca.consultant_name || '',
+              ca.totalCost ?? ca.total_cost ?? 0,
+              ca.notes || '',
+              ca.createdBy || ca.created_by || 'admin',
+              ca.createdAt || ca.created_at || new Date().toISOString()
+            ]
+          );
+        });
+      }
+
+      if (Array.isArray(revenues)) {
+        revenues.forEach((rev: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO revenues (id, case_name, case_account_id, amount, collector_name, payment_method, collection_date, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              rev.id,
+              rev.caseName || rev.case_name || '',
+              rev.caseAccountId || rev.case_account_id || null,
+              rev.amount ?? 0,
+              rev.collectorName || rev.collector_name || '',
+              rev.paymentMethod || rev.payment_method || 'cash',
+              rev.collectionDate || rev.collection_date || '',
+              rev.notes || '',
+              rev.createdBy || rev.created_by || 'admin',
+              rev.createdAt || rev.created_at || new Date().toISOString()
+            ]
+          );
+        });
+      }
+
+      if (Array.isArray(outgoings)) {
+        outgoings.forEach((out: any) => {
+          this.run(
+            'INSERT OR REPLACE INTO outgoings (id, category, case_name, case_account_id, date, amount, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              out.id,
+              out.category || 'supplies',
+              out.caseName || out.case_name || '',
+              out.caseAccountId || out.case_account_id || null,
+              out.date || '',
+              out.amount ?? 0,
+              out.notes || '',
+              out.createdBy || out.created_by || 'admin',
+              out.createdAt || out.created_at || new Date().toISOString()
+            ]
+          );
+        });
+      }
+
+      if (Array.isArray(profitDistributions)) {
+        profitDistributions.forEach((pd: any) => {
+          const mai = Number(pd.drMaiAmount ?? pd.dr_mai_amount ?? 0) || 0;
+          const elham = Number(pd.drElhamAmount ?? pd.dr_elham_amount ?? 0) || 0;
+          const hany = Number(pd.drHanySamirAmount ?? pd.dr_hany_samir_amount ?? 0) || 0;
+          const other = Number(pd.otherDoctorAmount ?? pd.other_doctor_amount ?? 0) || 0;
+          const total = Math.round((mai + elham + hany + other) * 100) / 100;
+          this.run(
+            'INSERT OR REPLACE INTO profit_distributions (id, case_name, case_account_id, period_from, period_to, dr_mai_amount, dr_elham_amount, dr_hany_samir_amount, other_doctor_name, other_doctor_amount, total_distributed, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              pd.id,
+              pd.caseName || pd.case_name || '',
+              pd.caseAccountId || pd.case_account_id || null,
+              pd.periodFrom || pd.period_from || '',
+              pd.periodTo || pd.period_to || '',
+              mai,
+              elham,
+              hany,
+              pd.otherDoctorName || pd.other_doctor_name || '',
+              other,
+              pd.totalDistributed ?? pd.total_distributed ?? total,
+              pd.notes || '',
+              pd.createdBy || pd.created_by || 'admin',
+              pd.createdAt || pd.created_at || new Date().toISOString()
+            ]
+          );
+        });
+      }
+
+      // 12. Insert Activity Logs
       if (Array.isArray(activityLogs)) {
         activityLogs.forEach((l: any) => {
           this.run(

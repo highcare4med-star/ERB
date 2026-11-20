@@ -3,6 +3,7 @@ export interface User {
   username: string;
   fullName: string;
   roleId: string;
+  permissions?: string[];
   isActive: boolean;
   createdAt: string;
 }
@@ -47,6 +48,9 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id: string;
+  invoiceType?: 'sale' | 'return';
+  originalInvoiceId?: string;
+  returnReason?: string;
   date: string;
   customerId: string;
   customerName: string;
@@ -85,6 +89,76 @@ export interface Settings {
   primaryColor: string;
   secondaryColor: string;
   logoUrl?: string;
+}
+
+export type RevenuePaymentMethod = 'cash' | 'instapay' | 'e_wallet' | 'bank_transfer';
+
+export interface CaseAccount {
+  id: string;
+  caseName: string;
+  customerId?: string;
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  dailyNursingPrice: number;
+  consultantName: string;
+  totalCost: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface RevenueRecord {
+  id: string;
+  caseName: string;
+  caseAccountId?: string;
+  amount: number;
+  collectorName: string;
+  paymentMethod: RevenuePaymentMethod;
+  collectionDate: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export type OutgoingCategory =
+  | 'supplies'
+  | 'pharmacy_meds'
+  | 'labs'
+  | 'doctors'
+  | 'devices'
+  | 'ambulance_blood'
+  | 'abg'
+  | 'physiotherapy'
+  | 'treatment_stores';
+
+export interface OutgoingRecord {
+  id: string;
+  category: OutgoingCategory;
+  caseName: string;
+  caseAccountId?: string;
+  date: string;
+  amount: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ProfitDistributionRecord {
+  id: string;
+  caseName: string;
+  caseAccountId?: string;
+  periodFrom: string;
+  periodTo: string;
+  drMaiAmount: number;
+  drElhamAmount: number;
+  drHanySamirAmount: number;
+  otherDoctorName: string;
+  otherDoctorAmount: number;
+  totalDistributed: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface AppState {

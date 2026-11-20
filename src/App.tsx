@@ -18,7 +18,8 @@ import {
   Heart,
   Globe,
   Printer,
-  RefreshCw
+  RefreshCw,
+  Wallet
 } from 'lucide-react';
 
 // Import Types
@@ -35,6 +36,7 @@ import UserList from './components/UserList';
 import SettingsForm from './components/SettingsForm';
 import AuditLogs from './components/AuditLogs';
 import InvoicePrint from './components/InvoicePrint';
+import AccountsManagement from './components/AccountsManagement';
 
 export default function App() {
   // Session & Auth state
@@ -61,6 +63,24 @@ export default function App() {
   // Toast notifications state
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Helper permissions (computed safely at top level)
+  const perms = session?.permissions || [];
+  const canAccessAccounts =
+    Boolean(session && (session.roleId === 'admin' || session.roleId === 'company_manager') && perms.includes('manage_accounts'));
+
+  const getDefaultTab = (permissions: string[], roleId?: string): string => {
+    if (permissions.includes('view_dashboard')) return 'dashboard';
+    if (permissions.includes('create_invoice')) return 'new-invoice';
+    if (permissions.includes('view_invoices')) return 'invoices';
+    if (permissions.includes('manage_customers')) return 'customers';
+    if (permissions.includes('manage_services')) return 'services';
+    if ((roleId === 'admin' || roleId === 'company_manager') && permissions.includes('manage_accounts')) return 'accounts';
+    if (permissions.includes('manage_users')) return 'users';
+    if (permissions.includes('view_logs')) return 'logs';
+    if (permissions.includes('manage_settings')) return 'settings';
+    return 'invoices';
+  };
+
   // 1. Inspect URL parameters for sharing / printing
   useEffect(() => {
     const path = window.location.pathname;
@@ -73,12 +93,47 @@ export default function App() {
       const savedToken = sessionStorage.getItem('hicare_token');
       const savedUser = sessionStorage.getItem('hicare_user');
       if (savedToken && savedUser) {
+        const parsedUser = JSON.parse(savedUser);
         setToken(savedToken);
-        setSession(JSON.parse(savedUser));
+        setSession(parsedUser);
+        fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data?.user) {
+              setSession(data.user);
+              sessionStorage.setItem('hicare_user', JSON.stringify(data.user));
+            }
+          })
+          .catch(() => {});
       }
       setAuthChecked(true);
     }
   }, []);
+
+  // Sidebar Tabs depending on credentials (computed unconditionally before any early returns)
+  const navigationItems = [
+    { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, visible: perms.includes('view_dashboard') },
+    { id: 'new-invoice', label: 'إصدار فاتورة', icon: FilePlus, visible: perms.includes('create_invoice') },
+    { id: 'invoices', label: 'سجل الفواتير', icon: FileText, visible: perms.includes('view_invoices') },
+    { id: 'customers', label: 'سجل العملاء', icon: Users, visible: perms.includes('manage_customers') || perms.includes('view_invoices') },
+    { id: 'services', label: 'الخدمات الطبية', icon: HeartHandshake, visible: perms.includes('manage_services') || perms.includes('create_invoice') || perms.includes('view_invoices') },
+    { id: 'accounts', label: 'الحسابات', icon: Wallet, visible: canAccessAccounts },
+    { id: 'users', label: 'المستخدمين', icon: Shield, visible: perms.includes('manage_users') },
+    { id: 'logs', label: 'سجل العمليات', icon: History, visible: perms.includes('view_logs') },
+    { id: 'settings', label: 'إعدادات الشركة', icon: SettingsIcon, visible: perms.includes('manage_settings') },
+  ];
+
+  const visibleNavs = navigationItems.filter(item => item.visible);
+
+  useEffect(() => {
+    if (!session || !token || publicPrintId || !authChecked) return;
+    const isTabVisible = visibleNavs.some(item => item.id === activeTab);
+    if (!isTabVisible) {
+      setActiveTab(getDefaultTab(perms, session.roleId));
+    }
+  }, [session, token, publicPrintId, authChecked, activeTab, perms.join(','), canAccessAccounts]);
 
   const fetchPublicInvoice = async (invoiceId: string) => {
     setPublicLoading(true);
@@ -108,6 +163,7 @@ export default function App() {
     // Persist in session storage
     sessionStorage.setItem('hicare_token', newToken);
     sessionStorage.setItem('hicare_user', JSON.stringify(newUser));
+    setActiveTab(getDefaultTab(newUser?.permissions || [], newUser?.roleId));
     showToast('تم تسجيل الدخول بنجاح! مرحباً بك في نظام هاي كير.');
   };
 
@@ -201,23 +257,6 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Permissions array helper
-  const perms = session.permissions;
-
-  // Sidebar Tabs depending on credentials
-  const navigationItems = [
-    { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, visible: true },
-    { id: 'new-invoice', label: 'إصدار فاتورة', icon: FilePlus, visible: perms.includes('create_invoice') },
-    { id: 'invoices', label: 'سجل الفواتير', icon: FileText, visible: perms.includes('view_invoices') },
-    { id: 'customers', label: 'سجل العملاء', icon: Users, visible: perms.includes('manage_customers') || perms.includes('view_invoices') },
-    { id: 'services', label: 'الخدمات الطبية', icon: HeartHandshake, visible: true },
-    { id: 'users', label: 'المستخدمين', icon: Shield, visible: perms.includes('manage_users') },
-    { id: 'logs', label: 'سجل العمليات', icon: History, visible: perms.includes('view_logs') },
-    { id: 'settings', label: 'إعدادات الشركة', icon: SettingsIcon, visible: perms.includes('manage_settings') },
-  ];
-
-  const visibleNavs = navigationItems.filter(item => item.visible);
-
   return (
     <div className="min-h-screen bg-transparent flex font-sans text-slate-800" dir="rtl">
       
@@ -291,7 +330,19 @@ export default function App() {
             <div className="flex-1 min-w-0">
               <h4 className="text-xs font-bold text-white truncate">{session.fullName}</h4>
               <p className="text-[9px] text-slate-400 font-semibold truncate mt-0.5">
-                {session.roleId === 'admin' ? 'مدير نظام' : session.roleId === 'financial' ? 'مدير مالي' : session.roleId === 'billing' ? 'موظف فواتير' : 'قراءة فقط'}
+                {session.roleId === 'admin'
+                  ? 'مدير النظام'
+                  : session.roleId === 'company_manager'
+                    ? 'مدير الشركة'
+                    : session.roleId === 'operations_manager'
+                      ? 'مشرف التشغيل والفواتير'
+                      : session.roleId === 'financial'
+                        ? 'مدير مالي'
+                        : session.roleId === 'billing'
+                          ? 'موظف فواتير'
+                          : session.roleId === 'data_entry'
+                            ? 'مدخل بيانات'
+                            : 'موظف مصرح'}
               </p>
             </div>
           </div>
@@ -444,7 +495,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.25 }}
               >
-                {activeTab === 'dashboard' && (
+                {activeTab === 'dashboard' && perms.includes('view_dashboard') && (
                   <Dashboard
                     token={token}
                     userPermissions={perms}
@@ -453,16 +504,16 @@ export default function App() {
                   />
                 )}
                 
-                {activeTab === 'new-invoice' && (
+                {activeTab === 'new-invoice' && perms.includes('create_invoice') && (
                   <InvoiceForm
                     token={token}
                     editingInvoice={null}
-                    onCancel={() => setActiveTab('dashboard')}
+                    onCancel={() => setActiveTab(getDefaultTab(perms, session.roleId))}
                     onSuccess={handleInvoiceIssued}
                   />
                 )}
 
-                {activeTab === 'invoices' && (
+                {activeTab === 'invoices' && perms.includes('view_invoices') && (
                   <InvoiceList
                     token={token}
                     currentUsername={session.username}
@@ -472,7 +523,7 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === 'customers' && (
+                {activeTab === 'customers' && (perms.includes('manage_customers') || perms.includes('view_invoices')) && (
                   <CustomerList
                     token={token}
                     userPermissions={perms}
@@ -480,27 +531,33 @@ export default function App() {
                   />
                 )}
 
-                {activeTab === 'services' && (
+                {activeTab === 'services' && (perms.includes('manage_services') || perms.includes('create_invoice') || perms.includes('view_invoices')) && (
                   <ServiceList
                     token={token}
                     userPermissions={perms}
                   />
                 )}
 
-                {activeTab === 'users' && (
+                {activeTab === 'accounts' && canAccessAccounts && (
+                  <AccountsManagement
+                    token={token}
+                  />
+                )}
+
+                {activeTab === 'users' && perms.includes('manage_users') && (
                   <UserList
                     token={token}
                     currentUsername={session.username}
                   />
                 )}
 
-                {activeTab === 'logs' && (
+                {activeTab === 'logs' && perms.includes('view_logs') && (
                   <AuditLogs
                     token={token}
                   />
                 )}
 
-                {activeTab === 'settings' && (
+                {activeTab === 'settings' && perms.includes('manage_settings') && (
                   <SettingsForm
                     token={token}
                   />

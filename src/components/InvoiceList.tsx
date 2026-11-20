@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, User, Phone, CheckCircle, AlertTriangle, FileSpreadsheet, Printer, Edit2, Trash2, XCircle, RefreshCw } from 'lucide-react';
+import { Search, Filter, Calendar, User, Phone, CheckCircle, AlertTriangle, FileSpreadsheet, Printer, Edit2, Trash2, XCircle, RefreshCw, RotateCcw } from 'lucide-react';
 import { Invoice } from '../types';
 
 interface InvoiceListProps {
@@ -22,6 +22,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
   const [searchPhone, setSearchPhone] = useState('');
   const [searchDate, setSearchDate] = useState('');
   const [searchStatus, setSearchStatus] = useState('all');
+  const [searchInvoiceType, setSearchInvoiceType] = useState('all');
   const [searchCreator, setSearchCreator] = useState('');
   
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
       if (searchPhone) params.append('phone', searchPhone);
       if (searchDate) params.append('date', searchDate);
       if (searchStatus && searchStatus !== 'all') params.append('status', searchStatus);
+      if (searchInvoiceType && searchInvoiceType !== 'all') params.append('invoiceType', searchInvoiceType);
       if (searchCreator) params.append('creator', searchCreator);
 
       const response = await fetch(`/api/invoices?${params.toString()}`, {
@@ -60,7 +62,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
 
   useEffect(() => {
     fetchInvoices();
-  }, [searchId, searchCustomer, searchPhone, searchDate, searchStatus, searchCreator, token]);
+  }, [searchId, searchCustomer, searchPhone, searchDate, searchStatus, searchInvoiceType, searchCreator, token]);
 
   const handleClearFilters = () => {
     setSearchId('');
@@ -68,6 +70,7 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
     setSearchPhone('');
     setSearchDate('');
     setSearchStatus('all');
+    setSearchInvoiceType('all');
     setSearchCreator('');
   };
 
@@ -269,6 +272,20 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
             </div>
           </div>
 
+          {/* Filter Invoice Type */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">نوع الفاتورة</label>
+            <select
+              value={searchInvoiceType}
+              onChange={(e) => setSearchInvoiceType(e.target.value)}
+              className="block w-full px-3 py-2 glass-input rounded-xl text-sm focus:outline-none"
+            >
+              <option value="all">كل الفواتير</option>
+              <option value="sale">مبيعات عادية</option>
+              <option value="return">فواتير مرتجع</option>
+            </select>
+          </div>
+
           {/* Filter Status */}
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">حالة الفاتورة</label>
@@ -326,7 +343,26 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
                 ) : (
                   invoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-white/15 transition-colors">
-                      <td className="py-3.5 px-6 font-bold text-slate-900 font-mono">{inv.id}</td>
+                      <td className="py-3.5 px-6">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 font-mono">{inv.id}</span>
+                          {inv.invoiceType === 'return' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                              <RotateCcw className="h-3 w-3" /> مرتجع
+                            </span>
+                          )}
+                        </div>
+                        {inv.returnReason && (
+                          <div className="text-[11px] text-amber-700 mt-0.5 max-w-[200px] truncate" title={inv.returnReason}>
+                            سبب: {inv.returnReason}
+                          </div>
+                        )}
+                        {inv.originalInvoiceId && (
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            عن: {inv.originalInvoiceId}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3.5 px-6 text-slate-600 font-mono">{inv.date}</td>
                       <td className="py-3.5 px-6 font-semibold text-slate-800">{inv.customerName}</td>
                       <td className="py-3.5 px-6 text-slate-500 font-mono">{inv.customerPhone}</td>
@@ -337,10 +373,10 @@ export default function InvoiceList({ token, onSelectInvoice, onEditInvoice, use
                       <td className="py-3.5 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                           inv.status === 'new' 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                            ? (inv.invoiceType === 'return' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-100')
                             : 'bg-red-50 text-red-700 border border-red-100'
                         }`}>
-                          {inv.status === 'new' ? 'جديدة' : 'ملغاة'}
+                          {inv.status === 'new' ? (inv.invoiceType === 'return' ? 'مرتجع مسجل' : 'جديدة') : 'ملغاة'}
                         </span>
                       </td>
                       <td className="py-3.5 px-6 text-center">

@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
-import { db, hashPassword, User, Role, Customer, Service, Invoice, Settings, ActivityLog } from './server/db.ts';
+import { db, hashPassword, User, Role, Customer, Service, Invoice, Settings, ActivityLog, CaseAccount, RevenueRecord, RevenuePaymentMethod, OutgoingRecord, OutgoingCategory, ProfitDistributionRecord } from './server/db.ts';
 
 const app = express();
 const PORT = 3000;
@@ -61,6 +61,27 @@ function requirePermission(permission: string) {
   };
 }
 
+const ACCOUNTS_ALLOWED_ROLES = new Set(['admin', 'company_manager']);
+
+function sanitizeEffectivePermissions(roleId: string, permissions: string[]): string[] {
+  if (!ACCOUNTS_ALLOWED_ROLES.has(roleId)) {
+    return permissions.filter(p => p !== 'manage_accounts');
+  }
+  return permissions;
+}
+
+// Strict Accounts Authorization Middleware (Admin & Company Manager only)
+function requireAccountsAccess(req: any, res: express.Response, next: express.NextFunction) {
+  if (
+    !req.user ||
+    !ACCOUNTS_ALLOWED_ROLES.has(req.user.roleId) ||
+    !req.user.permissions.includes('manage_accounts')
+  ) {
+    return res.status(403).json({ error: 'عذراً، قسم الحسابات مخصص حصرياً لمدير الشركة ومدير النظام فقط' });
+  }
+  next();
+}
+
 // --- API Endpoints ---
 
 // 1. Authentication Endpoints
@@ -88,9 +109,13 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
   }
 
-  // Get user role permissions
+  // Get user role permissions or custom assigned permissions
   const role = db.getRoleById(user.roleId);
-  const permissions = role ? role.permissions : [];
+  const rolePermissions = role ? role.permissions : [];
+  const rawPermissions = (user.permissions && Array.isArray(user.permissions))
+    ? user.permissions
+    : rolePermissions;
+  const permissions = sanitizeEffectivePermissions(user.roleId, rawPermissions);
 
   // Generate session token
   const token = crypto.randomBytes(32).toString('hex');
@@ -128,7 +153,7 @@ app.get('/api/auth/me', requireAuth, (req: any, res) => {
 
 
 // 2. Dashboard Endpoints
-app.get('/api/dashboard', requireAuth, (req: any, res) => {
+app.get('/api/dashboard', requireAuth, requirePermission('view_dashboard'), (req: any, res) => {
   const hasReports = req.user.permissions.includes('view_reports') || req.user.permissions.includes('manage_settings');
   if (!hasReports) {
     // Limited view for billing/readonly: only latest invoices and active services
@@ -155,6 +180,7 @@ app.get('/api/users', requireAuth, requirePermission('manage_users'), (req, res)
     username: u.username,
     fullName: u.fullName,
     roleId: u.roleId,
+    permissions: u.permissions,
     isActive: u.isActive,
     createdAt: u.createdAt
   }));
@@ -163,11 +189,20 @@ app.get('/api/users', requireAuth, requirePermission('manage_users'), (req, res)
 });
 
 app.post('/api/users', requireAuth, requirePermission('manage_users'), (req: any, res) => {
-  const { username, password, fullName, roleId, isActive } = req.body;
+  const { username, password, fullName, roleId, isActive, permissions } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   if (!username || !password || !fullName || !roleId) {
     return res.status(400).json({ error: 'يرجى إدخال جميع الحقول المطلوبة لإنشاء المستخدم' });
+  }
+
+  const targetRole = db.getRoleById(roleId);
+  if (!targetRole) {
+    return res.status(400).json({ error: 'الدور الوظيفي المحدد غير صالح' });
+  }
+
+  if (Array.isArray(permissions) && permissions.includes('manage_accounts') && !ACCOUNTS_ALLOWED_ROLES.has(roleId)) {
+    return res.status(400).json({ error: 'صلاحية قسم الحسابات مخصصة حصرياً لدور مدير النظام ومدير الشركة فقط' });
   }
 
   const existing = db.getUserByUsername(username);
@@ -181,6 +216,7 @@ app.post('/api/users', requireAuth, requirePermission('manage_users'), (req: any
     passwordHash: hashPassword(password),
     fullName,
     roleId,
+    permissions: Array.isArray(permissions) ? sanitizeEffectivePermissions(roleId, permissions) : undefined,
     isActive: isActive !== undefined ? isActive : true,
     createdAt: new Date().toISOString()
   };
@@ -191,6 +227,7 @@ app.post('/api/users', requireAuth, requirePermission('manage_users'), (req: any
     username: newUser.username,
     fullName: newUser.fullName,
     roleId: newUser.roleId,
+    permissions: newUser.permissions,
     isActive: newUser.isActive,
     createdAt: newUser.createdAt
   });
@@ -198,7 +235,7 @@ app.post('/api/users', requireAuth, requirePermission('manage_users'), (req: any
 
 app.put('/api/users/:id', requireAuth, requirePermission('manage_users'), (req: any, res) => {
   const { id } = req.params;
-  const { fullName, roleId, isActive, password } = req.body;
+  const { fullName, roleId, isActive, password, permissions } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   const user = db.getUserById(id);
@@ -211,20 +248,52 @@ app.put('/api/users/:id', requireAuth, requirePermission('manage_users'), (req: 
     return res.status(400).json({ error: 'لا يمكن تعطيل حساب مدير النظام الرئيسي' });
   }
 
+  const nextRoleId = roleId || user.roleId;
+  const targetRole = db.getRoleById(nextRoleId);
+  if (!targetRole) {
+    return res.status(400).json({ error: 'الدور الوظيفي المحدد غير صالح' });
+  }
+
+  if (Array.isArray(permissions) && permissions.includes('manage_accounts') && !ACCOUNTS_ALLOWED_ROLES.has(nextRoleId)) {
+    return res.status(400).json({ error: 'صلاحية قسم الحسابات مخصصة حصرياً لدور مدير النظام ومدير الشركة فقط' });
+  }
+
+  const nextPermissions =
+    permissions !== undefined
+      ? (Array.isArray(permissions) ? sanitizeEffectivePermissions(nextRoleId, permissions) : undefined)
+      : (user.permissions ? sanitizeEffectivePermissions(nextRoleId, user.permissions) : undefined);
+
   const updated: User = {
     ...user,
     fullName: fullName || user.fullName,
-    roleId: roleId || user.roleId,
+    roleId: nextRoleId,
+    permissions: nextPermissions,
     isActive: isActive !== undefined ? isActive : user.isActive,
     passwordHash: password ? hashPassword(password) : user.passwordHash
   };
 
   db.saveUser(updated, req.user.username, ip, ua);
+
+  // Update active sessions in memory so new permissions apply immediately
+  for (const session of activeSessions.values()) {
+    if (session.username.toLowerCase() === updated.username.toLowerCase()) {
+      const role = db.getRoleById(updated.roleId);
+      const rolePermissions = role ? role.permissions : [];
+      const rawPerms = (updated.permissions && Array.isArray(updated.permissions))
+        ? updated.permissions
+        : rolePermissions;
+      session.permissions = sanitizeEffectivePermissions(updated.roleId, rawPerms);
+      session.roleId = updated.roleId;
+      session.fullName = updated.fullName;
+    }
+  }
+
   res.json({
     id: updated.id,
     username: updated.username,
     fullName: updated.fullName,
     roleId: updated.roleId,
+    permissions: updated.permissions,
     isActive: updated.isActive,
     createdAt: updated.createdAt
   });
@@ -433,7 +502,7 @@ app.put('/api/customers/:id', requireAuth, requirePermission('manage_customers')
 
 // 6. Invoices Endpoints
 app.get('/api/invoices', requireAuth, (req, res) => {
-  const { id, customerName, phone, date, creator, status, search } = req.query;
+  const { id, customerName, phone, date, creator, status, invoiceType, search } = req.query;
   let list = db.getInvoices();
 
   // Advanced Filters
@@ -455,6 +524,9 @@ app.get('/api/invoices', requireAuth, (req, res) => {
   if (status && status !== 'all') {
     list = list.filter(i => i.status === status);
   }
+  if (invoiceType && invoiceType !== 'all') {
+    list = list.filter(i => (i.invoiceType || 'sale') === invoiceType);
+  }
   if (search) {
     const q = (search as string).toLowerCase().trim();
     list = list.filter(i => 
@@ -462,7 +534,8 @@ app.get('/api/invoices', requireAuth, (req, res) => {
       i.customerName.toLowerCase().includes(q) ||
       i.customerPhone.includes(q) ||
       i.createdBy.toLowerCase().includes(q) ||
-      i.notes.toLowerCase().includes(q)
+      i.notes.toLowerCase().includes(q) ||
+      (i.returnReason && i.returnReason.toLowerCase().includes(q))
     );
   }
 
@@ -505,17 +578,17 @@ app.get('/api/public/invoices/:id', (req, res) => {
 });
 
 app.post('/api/invoices', requireAuth, requirePermission('create_invoice'), (req: any, res) => {
-  const { date, customerName, customerPhone, customerAddress, items, discountType, discountValue, notes } = req.body;
+  const { date, customerName, customerPhone, customerAddress, items, discountType, discountValue, notes, invoiceType, originalInvoiceId, returnReason } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   if (!customerName || !customerPhone || !items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'يرجى إدخال اسم العميل وهاتفه والخدمات المطلوبة' });
+    return res.status(400).json({ error: 'يرجى إدخال اسم العميل وهاتفه والخدمات/الأدوية المطلوبة' });
   }
 
   // Validate items
   for (const item of items) {
     if (!item.serviceId || !item.serviceName || item.quantity <= 0 || item.price < 0) {
-      return res.status(400).json({ error: 'بيانات الخدمات غير صالحة، يرجى مراجعة الكميات والأسعار' });
+      return res.status(400).json({ error: 'بيانات الأصناف/الخدمات غير صالحة، يرجى مراجعة الكميات والأسعار' });
     }
   }
 
@@ -534,6 +607,9 @@ app.post('/api/invoices', requireAuth, requirePermission('create_invoice'), (req
   const total = subtotal - discountAmount;
 
   const invoiceData: Omit<Invoice, 'id' | 'createdAt'> = {
+    invoiceType: (invoiceType as 'sale' | 'return') || 'sale',
+    originalInvoiceId: originalInvoiceId || undefined,
+    returnReason: returnReason || undefined,
     date: date || new Date().toISOString().split('T')[0],
     customerId: '', // Will be resolved or auto-created in db.ts
     customerName,
@@ -569,7 +645,7 @@ app.post('/api/invoices', requireAuth, requirePermission('create_invoice'), (req
 
 app.put('/api/invoices/:id', requireAuth, requirePermission('edit_invoice'), (req: any, res) => {
   const { id } = req.params;
-  const { date, customerName, customerPhone, customerAddress, items, discountType, discountValue, notes } = req.body;
+  const { date, customerName, customerPhone, customerAddress, items, discountType, discountValue, notes, invoiceType, originalInvoiceId, returnReason } = req.body;
   const { ip, ua } = getRequestMeta(req);
 
   const invoice = db.getInvoiceById(id);
@@ -634,7 +710,10 @@ app.put('/api/invoices/:id', requireAuth, requirePermission('edit_invoice'), (re
     discountValue: dVal,
     discountAmount,
     total,
-    notes: notes !== undefined ? notes : invoice.notes
+    notes: notes !== undefined ? notes : invoice.notes,
+    invoiceType: invoiceType || invoice.invoiceType,
+    originalInvoiceId: originalInvoiceId !== undefined ? originalInvoiceId : invoice.originalInvoiceId,
+    returnReason: returnReason !== undefined ? returnReason : invoice.returnReason
   };
 
   try {
@@ -767,6 +846,581 @@ app.get('/api/reports', requireAuth, requirePermission('view_reports'), (req, re
 app.get('/api/logs', requireAuth, requirePermission('view_logs'), (req, res) => {
   const logs = db.getActivityLogs();
   res.json(logs);
+});
+
+
+// 9. Company Accounts Endpoints (Case Accounts & Revenues - Strict manage_accounts permission)
+const VALID_PAYMENT_METHODS: RevenuePaymentMethod[] = ['cash', 'instapay', 'e_wallet', 'bank_transfer'];
+
+function isValidIsoDate(val: unknown): val is string {
+  if (typeof val !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(val)) return false;
+  const [y, m, d] = val.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+app.get('/api/accounts/case-accounts', requireAuth, requireAccountsAccess, (req, res) => {
+  const { search } = req.query;
+  let list = db.getCaseAccounts();
+  if (search && typeof search === 'string') {
+    const q = search.toLowerCase().trim();
+    list = list.filter(item =>
+      item.caseName.toLowerCase().includes(q) ||
+      item.consultantName.toLowerCase().includes(q) ||
+      (item.notes && item.notes.toLowerCase().includes(q))
+    );
+  }
+  res.json(list);
+});
+
+app.post('/api/accounts/case-accounts', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { caseName, customerId, startDate, endDate, dailyNursingPrice, consultantName, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  if (typeof caseName !== 'string' || !caseName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (typeof consultantName !== 'string' || !consultantName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الاستشاري' });
+  }
+  if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ بدء وتاريخ انتهاء صحيحين' });
+  }
+
+  const priceNum = Number(dailyNursingPrice);
+  if (!Number.isFinite(priceNum) || priceNum < 0) {
+    return res.status(400).json({ error: 'سعر التمريض اليومي يجب أن يكون رقماً صحيحاً غير سالب' });
+  }
+
+  try {
+    const daysCount = db.calculateInclusiveDays(startDate, endDate);
+    const totalCost = Math.round((daysCount * priceNum) * 100) / 100;
+    const record: CaseAccount = {
+      id: `ca-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      caseName: caseName.trim(),
+      customerId: typeof customerId === 'string' && customerId.trim() ? customerId.trim() : undefined,
+      startDate,
+      endDate,
+      daysCount,
+      dailyNursingPrice: priceNum,
+      consultantName: consultantName.trim(),
+      totalCost,
+      notes: typeof notes === 'string' ? notes.trim() : '',
+      createdBy: req.user.username,
+      createdAt: new Date().toISOString()
+    };
+
+    const saved = db.saveCaseAccount(record, req.user.username, ip, ua);
+    res.json(saved);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'تعذر حفظ حساب الحالة' });
+  }
+});
+
+app.put('/api/accounts/case-accounts/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { caseName, customerId, startDate, endDate, dailyNursingPrice, consultantName, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  const existing = db.getCaseAccountById(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'سجل حساب الحالة غير موجود' });
+  }
+
+  const nextCaseName = typeof caseName === 'string' ? caseName.trim() : existing.caseName;
+  const nextConsultantName = typeof consultantName === 'string' ? consultantName.trim() : existing.consultantName;
+  const nextStartDate = startDate !== undefined ? startDate : existing.startDate;
+  const nextEndDate = endDate !== undefined ? endDate : existing.endDate;
+  const nextPrice = dailyNursingPrice !== undefined ? Number(dailyNursingPrice) : existing.dailyNursingPrice;
+
+  if (!nextCaseName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!nextConsultantName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الاستشاري' });
+  }
+  if (!isValidIsoDate(nextStartDate) || !isValidIsoDate(nextEndDate)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ بدء وتاريخ انتهاء صحيحين' });
+  }
+  if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+    return res.status(400).json({ error: 'سعر التمريض اليومي يجب أن يكون رقماً صحيحاً غير سالب' });
+  }
+
+  try {
+    const daysCount = db.calculateInclusiveDays(nextStartDate, nextEndDate);
+    const totalCost = Math.round((daysCount * nextPrice) * 100) / 100;
+    const updated: CaseAccount = {
+      ...existing,
+      caseName: nextCaseName,
+      customerId: customerId !== undefined
+        ? (typeof customerId === 'string' && customerId.trim() ? customerId.trim() : undefined)
+        : existing.customerId,
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      daysCount,
+      dailyNursingPrice: nextPrice,
+      consultantName: nextConsultantName,
+      totalCost,
+      notes: notes !== undefined ? (typeof notes === 'string' ? notes.trim() : '') : existing.notes
+    };
+
+    const saved = db.saveCaseAccount(updated, req.user.username, ip, ua);
+    res.json(saved);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'تعذر تعديل حساب الحالة' });
+  }
+});
+
+app.delete('/api/accounts/case-accounts/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { ip, ua } = getRequestMeta(req);
+
+  const deleted = db.deleteCaseAccount(id, req.user.username, ip, ua);
+  if (!deleted) {
+    return res.status(404).json({ error: 'سجل حساب الحالة غير موجود' });
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/accounts/revenues', requireAuth, requireAccountsAccess, (req, res) => {
+  const { search, paymentMethod, startDate, endDate } = req.query;
+  let list = db.getRevenues();
+
+  if (paymentMethod && typeof paymentMethod === 'string' && paymentMethod !== 'all') {
+    list = list.filter(r => r.paymentMethod === paymentMethod);
+  }
+  if (startDate && typeof startDate === 'string') {
+    list = list.filter(r => r.collectionDate >= startDate);
+  }
+  if (endDate && typeof endDate === 'string') {
+    list = list.filter(r => r.collectionDate <= endDate);
+  }
+  if (search && typeof search === 'string') {
+    const q = search.toLowerCase().trim();
+    list = list.filter(r =>
+      r.caseName.toLowerCase().includes(q) ||
+      r.collectorName.toLowerCase().includes(q) ||
+      (r.notes && r.notes.toLowerCase().includes(q))
+    );
+  }
+
+  res.json(list);
+});
+
+app.post('/api/accounts/revenues', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { caseName, caseAccountId, amount, collectorName, paymentMethod, collectionDate, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  if (typeof caseName !== 'string' || !caseName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (typeof collectorName !== 'string' || !collectorName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم المحصل' });
+  }
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return res.status(400).json({ error: 'مبلغ التحصيل يجب أن يكون رقماً أكبر من الصفر' });
+  }
+  if (!VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+    return res.status(400).json({ error: 'نوع التحصيل غير صالح' });
+  }
+  if (!isValidIsoDate(collectionDate)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ تحصيل صحيح' });
+  }
+
+  const record: RevenueRecord = {
+    id: `rev-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+    caseName: caseName.trim(),
+    caseAccountId: typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined,
+    amount: Math.round(amountNum * 100) / 100,
+    collectorName: collectorName.trim(),
+    paymentMethod,
+    collectionDate,
+    notes: typeof notes === 'string' ? notes.trim() : '',
+    createdBy: req.user.username,
+    createdAt: new Date().toISOString()
+  };
+
+  const saved = db.saveRevenue(record, req.user.username, ip, ua);
+  res.json(saved);
+});
+
+app.put('/api/accounts/revenues/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { caseName, caseAccountId, amount, collectorName, paymentMethod, collectionDate, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  const existing = db.getRevenueById(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'سجل التحصيل غير موجود' });
+  }
+
+  const nextCaseName = typeof caseName === 'string' ? caseName.trim() : existing.caseName;
+  const nextCollectorName = typeof collectorName === 'string' ? collectorName.trim() : existing.collectorName;
+  const nextAmount = amount !== undefined ? Number(amount) : existing.amount;
+  const nextMethod = paymentMethod !== undefined ? paymentMethod : existing.paymentMethod;
+  const nextDate = collectionDate !== undefined ? collectionDate : existing.collectionDate;
+
+  if (!nextCaseName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!nextCollectorName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم المحصل' });
+  }
+  if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
+    return res.status(400).json({ error: 'مبلغ التحصيل يجب أن يكون رقماً أكبر من الصفر' });
+  }
+  if (!VALID_PAYMENT_METHODS.includes(nextMethod)) {
+    return res.status(400).json({ error: 'نوع التحصيل غير صالح' });
+  }
+  if (!isValidIsoDate(nextDate)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ تحصيل صحيح' });
+  }
+
+  const updated: RevenueRecord = {
+    ...existing,
+    caseName: nextCaseName,
+    caseAccountId: caseAccountId !== undefined
+      ? (typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined)
+      : existing.caseAccountId,
+    amount: Math.round(nextAmount * 100) / 100,
+    collectorName: nextCollectorName,
+    paymentMethod: nextMethod,
+    collectionDate: nextDate,
+    notes: notes !== undefined ? (typeof notes === 'string' ? notes.trim() : '') : existing.notes
+  };
+
+  const saved = db.saveRevenue(updated, req.user.username, ip, ua);
+  res.json(saved);
+});
+
+app.delete('/api/accounts/revenues/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { ip, ua } = getRequestMeta(req);
+
+  const deleted = db.deleteRevenue(id, req.user.username, ip, ua);
+  if (!deleted) {
+    return res.status(404).json({ error: 'سجل التحصيل غير موجود' });
+  }
+  res.json({ success: true });
+});
+
+// Outgoings / Section 3 Endpoints (قسم الخارج)
+const VALID_OUTGOING_CATEGORIES: OutgoingCategory[] = [
+  'supplies',
+  'pharmacy_meds',
+  'labs',
+  'doctors',
+  'devices',
+  'ambulance_blood',
+  'abg',
+  'physiotherapy',
+  'treatment_stores'
+];
+
+app.get('/api/accounts/outgoings', requireAuth, requireAccountsAccess, (req, res) => {
+  const { category, search, startDate, endDate } = req.query;
+  let list = db.getOutgoings();
+
+  if (category && typeof category === 'string' && category !== 'all') {
+    list = list.filter(o => o.category === category);
+  }
+  if (startDate && typeof startDate === 'string') {
+    list = list.filter(o => o.date >= startDate);
+  }
+  if (endDate && typeof endDate === 'string') {
+    list = list.filter(o => o.date <= endDate);
+  }
+  if (search && typeof search === 'string') {
+    const q = search.toLowerCase().trim();
+    list = list.filter(o =>
+      o.caseName.toLowerCase().includes(q) ||
+      (o.notes && o.notes.toLowerCase().includes(q))
+    );
+  }
+
+  res.json(list);
+});
+
+app.post('/api/accounts/outgoings', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { category, caseName, caseAccountId, date, amount, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  if (!VALID_OUTGOING_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: 'نوع البند غير صالح' });
+  }
+  if (typeof caseName !== 'string' || !caseName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!isValidIsoDate(date)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ صحيح' });
+  }
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return res.status(400).json({ error: 'المبلغ يجب أن يكون رقماً أكبر من الصفر' });
+  }
+
+  const record: OutgoingRecord = {
+    id: `out-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+    category,
+    caseName: caseName.trim(),
+    caseAccountId: typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined,
+    date,
+    amount: Math.round(amountNum * 100) / 100,
+    notes: typeof notes === 'string' ? notes.trim() : '',
+    createdBy: req.user.username,
+    createdAt: new Date().toISOString()
+  };
+
+  const saved = db.saveOutgoing(record, req.user.username, ip, ua);
+  res.json(saved);
+});
+
+app.put('/api/accounts/outgoings/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { category, caseName, caseAccountId, date, amount, notes } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  const existing = db.getOutgoingById(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'سجل بند الخارج غير موجود' });
+  }
+
+  const nextCategory = category !== undefined ? category : existing.category;
+  const nextCaseName = typeof caseName === 'string' ? caseName.trim() : existing.caseName;
+  const nextDate = date !== undefined ? date : existing.date;
+  const nextAmount = amount !== undefined ? Number(amount) : existing.amount;
+
+  if (!VALID_OUTGOING_CATEGORIES.includes(nextCategory)) {
+    return res.status(400).json({ error: 'نوع البند غير صالح' });
+  }
+  if (!nextCaseName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!isValidIsoDate(nextDate)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ صحيح' });
+  }
+  if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
+    return res.status(400).json({ error: 'المبلغ يجب أن يكون رقماً أكبر من الصفر' });
+  }
+
+  const updated: OutgoingRecord = {
+    ...existing,
+    category: nextCategory,
+    caseName: nextCaseName,
+    caseAccountId: caseAccountId !== undefined
+      ? (typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined)
+      : existing.caseAccountId,
+    date: nextDate,
+    amount: Math.round(nextAmount * 100) / 100,
+    notes: notes !== undefined ? (typeof notes === 'string' ? notes.trim() : '') : existing.notes
+  };
+
+  const saved = db.saveOutgoing(updated, req.user.username, ip, ua);
+  res.json(saved);
+});
+
+app.delete('/api/accounts/outgoings/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { ip, ua } = getRequestMeta(req);
+
+  const deleted = db.deleteOutgoing(id, req.user.username, ip, ua);
+  if (!deleted) {
+    return res.status(404).json({ error: 'سجل بند الخارج غير موجود' });
+  }
+  res.json({ success: true });
+});
+
+// Profit Distribution / Section 4 Endpoints (توزيع الأرباح)
+app.get('/api/accounts/profit-distributions', requireAuth, requireAccountsAccess, (req, res) => {
+  const { search, startDate, endDate } = req.query;
+  let list = db.getProfitDistributions();
+
+  if (startDate && typeof startDate === 'string') {
+    list = list.filter(p => p.periodTo >= startDate);
+  }
+  if (endDate && typeof endDate === 'string') {
+    list = list.filter(p => p.periodFrom <= endDate);
+  }
+  if (search && typeof search === 'string') {
+    const q = search.toLowerCase().trim();
+    list = list.filter(p =>
+      p.caseName.toLowerCase().includes(q) ||
+      (p.otherDoctorName && p.otherDoctorName.toLowerCase().includes(q)) ||
+      (p.notes && p.notes.toLowerCase().includes(q))
+    );
+  }
+
+  res.json(list);
+});
+
+app.post('/api/accounts/profit-distributions', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const {
+    caseName,
+    caseAccountId,
+    periodFrom,
+    periodTo,
+    drMaiAmount,
+    drElhamAmount,
+    drHanySamirAmount,
+    otherDoctorName,
+    otherDoctorAmount,
+    notes
+  } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  if (typeof caseName !== 'string' || !caseName.trim()) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!isValidIsoDate(periodFrom) || !isValidIsoDate(periodTo)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ المدة (من وإلى) بشكل صحيح' });
+  }
+
+  const maiNum = Number(drMaiAmount ?? 0);
+  const elhamNum = Number(drElhamAmount ?? 0);
+  const hanyNum = Number(drHanySamirAmount ?? 0);
+  const otherNum = Number(otherDoctorAmount ?? 0);
+  const cleanOtherDoctorName = typeof otherDoctorName === 'string' ? otherDoctorName.trim() : '';
+
+  if (
+    !Number.isFinite(maiNum) || maiNum < 0 ||
+    !Number.isFinite(elhamNum) || elhamNum < 0 ||
+    !Number.isFinite(hanyNum) || hanyNum < 0 ||
+    !Number.isFinite(otherNum) || otherNum < 0
+  ) {
+    return res.status(400).json({ error: 'يجب أن تكون جميع مبالغ توزيع الأرباح أرقاماً صحيحة غير سالبة' });
+  }
+
+  if (otherNum > 0 && !cleanOtherDoctorName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الطبيب المتغير عند تحديد مبلغ له' });
+  }
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const drMai = round2(maiNum);
+  const drElham = round2(elhamNum);
+  const drHany = round2(hanyNum);
+  const drOther = round2(otherNum);
+  const totalDistributed = round2(drMai + drElham + drHany + drOther);
+
+  try {
+    db.calculateInclusiveDays(periodFrom, periodTo);
+    const record: ProfitDistributionRecord = {
+      id: `pdist-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      caseName: caseName.trim(),
+      caseAccountId: typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined,
+      periodFrom,
+      periodTo,
+      drMaiAmount: drMai,
+      drElhamAmount: drElham,
+      drHanySamirAmount: drHany,
+      otherDoctorName: cleanOtherDoctorName,
+      otherDoctorAmount: drOther,
+      totalDistributed,
+      notes: typeof notes === 'string' ? notes.trim() : '',
+      createdBy: req.user.username,
+      createdAt: new Date().toISOString()
+    };
+
+    const saved = db.saveProfitDistribution(record, req.user.username, ip, ua);
+    res.json(saved);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'تعذر حفظ سجل توزيع الأرباح' });
+  }
+});
+
+app.put('/api/accounts/profit-distributions/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const {
+    caseName,
+    caseAccountId,
+    periodFrom,
+    periodTo,
+    drMaiAmount,
+    drElhamAmount,
+    drHanySamirAmount,
+    otherDoctorName,
+    otherDoctorAmount,
+    notes
+  } = req.body;
+  const { ip, ua } = getRequestMeta(req);
+
+  const existing = db.getProfitDistributionById(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'سجل توزيع الأرباح غير موجود' });
+  }
+
+  const nextCaseName = typeof caseName === 'string' ? caseName.trim() : existing.caseName;
+  const nextPeriodFrom = periodFrom !== undefined ? periodFrom : existing.periodFrom;
+  const nextPeriodTo = periodTo !== undefined ? periodTo : existing.periodTo;
+  const nextMai = drMaiAmount !== undefined ? Number(drMaiAmount) : existing.drMaiAmount;
+  const nextElham = drElhamAmount !== undefined ? Number(drElhamAmount) : existing.drElhamAmount;
+  const nextHany = drHanySamirAmount !== undefined ? Number(drHanySamirAmount) : existing.drHanySamirAmount;
+  const nextOther = otherDoctorAmount !== undefined ? Number(otherDoctorAmount) : existing.otherDoctorAmount;
+  const nextOtherName =
+    otherDoctorName !== undefined
+      ? (typeof otherDoctorName === 'string' ? otherDoctorName.trim() : '')
+      : existing.otherDoctorName;
+
+  if (!nextCaseName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الحالة' });
+  }
+  if (!isValidIsoDate(nextPeriodFrom) || !isValidIsoDate(nextPeriodTo)) {
+    return res.status(400).json({ error: 'يرجى إدخال تاريخ المدة (من وإلى) بشكل صحيح' });
+  }
+  if (
+    !Number.isFinite(nextMai) || nextMai < 0 ||
+    !Number.isFinite(nextElham) || nextElham < 0 ||
+    !Number.isFinite(nextHany) || nextHany < 0 ||
+    !Number.isFinite(nextOther) || nextOther < 0
+  ) {
+    return res.status(400).json({ error: 'يجب أن تكون جميع مبالغ توزيع الأرباح أرقاماً صحيحة غير سالبة' });
+  }
+  if (nextOther > 0 && !nextOtherName) {
+    return res.status(400).json({ error: 'يرجى إدخال اسم الطبيب المتغير عند تحديد مبلغ له' });
+  }
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const drMai = round2(nextMai);
+  const drElham = round2(nextElham);
+  const drHany = round2(nextHany);
+  const drOther = round2(nextOther);
+  const totalDistributed = round2(drMai + drElham + drHany + drOther);
+
+  try {
+    db.calculateInclusiveDays(nextPeriodFrom, nextPeriodTo);
+    const updated: ProfitDistributionRecord = {
+      ...existing,
+      caseName: nextCaseName,
+      caseAccountId: caseAccountId !== undefined
+        ? (typeof caseAccountId === 'string' && caseAccountId.trim() ? caseAccountId.trim() : undefined)
+        : existing.caseAccountId,
+      periodFrom: nextPeriodFrom,
+      periodTo: nextPeriodTo,
+      drMaiAmount: drMai,
+      drElhamAmount: drElham,
+      drHanySamirAmount: drHany,
+      otherDoctorName: nextOtherName,
+      otherDoctorAmount: drOther,
+      totalDistributed,
+      notes: notes !== undefined ? (typeof notes === 'string' ? notes.trim() : '') : existing.notes
+    };
+
+    const saved = db.saveProfitDistribution(updated, req.user.username, ip, ua);
+    res.json(saved);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'تعذر تعديل سجل توزيع الأرباح' });
+  }
+});
+
+app.delete('/api/accounts/profit-distributions/:id', requireAuth, requireAccountsAccess, (req: any, res) => {
+  const { id } = req.params;
+  const { ip, ua } = getRequestMeta(req);
+
+  const deleted = db.deleteProfitDistribution(id, req.user.username, ip, ua);
+  if (!deleted) {
+    return res.status(404).json({ error: 'سجل توزيع الأرباح غير موجود' });
+  }
+  res.json({ success: true });
 });
 
 
